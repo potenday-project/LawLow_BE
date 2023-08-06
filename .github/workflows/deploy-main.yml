@@ -1,0 +1,51 @@
+name: Main Branch CI/CD Workflow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: yarn # caching npm dependencies
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Testing with Jest
+        run: yarn test
+
+  pull_deploy:
+    name: Pull and Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executing remote ssh commands using password
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.NCP_SERVER_IP }}
+          username: ${{ secrets.NCP_SERVER_USER }}
+          password: ${{ secrets.NCP_SERVER_PW }}
+          port: ${{ secrets.NCP_SERVER_PORT }}
+          script: |
+            cd ~/LawLow_BE
+            git checkout main
+            git pull origin main
+            export NVM_DIR=~/.nvm
+            source ~/.nvm/nvm.sh
+            yarn install
+            yarn build
+            pm2 reload all
+
+# TODO: change runs-on to self-hosted runner (or change NCP to AWS)

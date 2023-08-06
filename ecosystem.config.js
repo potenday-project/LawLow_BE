@@ -2,11 +2,11 @@ module.exports = {
   apps: [
     {
       name: 'lawlow', // pm2 name
-      script: 'yarn start', // 앱 실행 스크립트
-      args: 'start',
+      script: './node_modules/.bin/nest', // 앱 실행 스크립트
+      args: 'start', // 앱 실행 스크립트
       exec_mode: 'cluster', // fork, cluster 모드 중 선택
-      watch: true, // 파일이 변경되었을 때 재시작 할지 선택
-      instances: 'max', // 클러스터 모드 사용 시 생성할 인스턴스 수(max/0은 CPU 수만큼 자동으로 생성)
+      watch: false, // 파일이 변경되었을 때 재시작 할지 선택
+      instances: '0', // 클러스터 모드 사용 시 생성할 인스턴스 수(max/0은 CPU 수만큼 자동으로 생성)
       port: 3000,
       merge_logs: true, // 클러스터 모드 사용 시 각 클러스터에서 생성되는 로그를 한 파일로 합쳐준다.
       out_file: '/dev/null', // outlog 저장 경로 설정(/dev/null은 outlog 미저장)

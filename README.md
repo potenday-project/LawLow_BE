@@ -1,3 +1,5 @@
+[![Main Branch CI/CD Workflow](https://github.com/potenday-project/LawLow_BE/actions/workflows/deploy-main.yml/badge.svg)](https://github.com/potenday-project/LawLow_BE/actions/workflows/deploy-main.yml)
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
 </p>

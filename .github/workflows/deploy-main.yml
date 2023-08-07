@@ -34,18 +34,19 @@ jobs:
       - name: Executing remote ssh commands using password
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.NCP_SERVER_IP }}
-          username: ${{ secrets.NCP_SERVER_USER }}
-          password: ${{ secrets.NCP_SERVER_PW }}
-          port: ${{ secrets.NCP_SERVER_PORT }}
+          host: ${{ secrets.AWS_SERVER_IP }}
+          username: ${{ secrets.AWS_SERVER_USER }}
+          key: ${{ secrets.AWS_SERVER_SSH_KEY }}
+          port: ${{ secrets.AWS_SERVER_PORT }}
           script: |
-            cd ~/LawLow_BE
-            git checkout main
-            git pull origin main
+            cd LawLow_BE
+            sudo git checkout main
+            sudo git pull origin main
             export NVM_DIR=~/.nvm
             source ~/.nvm/nvm.sh
             yarn install
             yarn build
             pm2 reload all
 
-# TODO: change runs-on to self-hosted runner (or change NCP to AWS)
+# TODO: Build the project and scp to the server.
+# TODO: Obtaining the IP address of the GitHub Actions and temporarily adding it to the AWS security group's inbound rules for SSH.

@@ -15,13 +15,13 @@ interface IResObject {
   message: string | null;
   detail: string | null;
 }
-
 interface ILog {
   timestamp: string;
   method: string;
   url: string;
   res: IResObject;
 }
+type Err = string | { message?: string; error?: string };
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -32,42 +32,46 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
-    const stack = exception.stack;
-
     if (!(exception instanceof HttpException)) {
       exception = new InternalServerErrorException(exception.message);
     }
 
-    const res: string | { message?: string; error?: string } = (exception as HttpException).getResponse();
+    const err: Err = (exception as HttpException).getResponse();
 
     const statusCode = (exception as HttpException).getStatus();
     const resObject: IResObject = {
       success: false,
       statusCode,
-      message: typeof res === 'string' ? res : res.message ?? exception.message ?? null,
-      detail:
-        typeof res === 'string'
-          ? `${res} at [ '${req.url}' ]`
-          : exception.name
-          ? `${exception.name} at [ '${req.url}' ]`
-          : res.error
-          ? `${res.error} at [ '${req.url}' ]`
-          : null,
+      message: typeof err === 'string' ? err : err.message ?? exception.message ?? null,
+      detail: this.getDetail(exception, err, req),
     };
 
+    this.logErrorOrWarning(exception, resObject, req);
+
+    response.status(statusCode).json(resObject);
+  }
+
+  private getDetail(exception: HttpException | Error, err: Err, request: Request): string | null {
+    if (typeof err === 'string') return `${err} at [ '${request.url}' ]`;
+    if (exception.name) return `${exception.name} at [ '${request.url}' ]`;
+    if (err.error) return `${err.error} at [ '${request.url}' ]`;
+
+    return null;
+  }
+
+  private logErrorOrWarning(exception: HttpException | Error, resObject: IResObject, request: Request): void {
     const log: ILog = {
       timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      method: req.method,
-      url: req.url,
+      method: request.method,
+      url: request.url,
       res: resObject,
     };
+    const stack = exception.stack;
 
-    if (statusCode >= 500) {
+    if (resObject.statusCode >= 500) {
       this.logger.error(log, stack);
     } else {
       this.logger.warn(log, stack);
     }
-
-    response.status(statusCode).json(resObject);
   }
 }

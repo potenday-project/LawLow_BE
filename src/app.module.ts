@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LawsModule } from './laws/laws.module';
+import { LawsModule } from './apis/laws/laws.module';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
+import { HttpExceptionFilter } from './common/http-exception.filter';
 
 @Module({
   imports: [
@@ -13,6 +15,12 @@ import { ConfigModule } from '@nestjs/config';
     LawsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}

@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder, SwaggerCustomOptions } from '@nestjs/swagger';
-import * as basicAuth from 'express-basic-auth';
+import basicAuth from 'express-basic-auth';
 
 // To keep alive authentication even after refreshing
 const swaggerCustomOptions: SwaggerCustomOptions = {

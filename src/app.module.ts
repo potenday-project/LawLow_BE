@@ -7,6 +7,9 @@ import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { SuccessInterceptor } from './common/interceptors/success.interceptor';
+import { NestModule } from '@nestjs/common';
+import { MiddlewareConsumer } from '@nestjs/common';
+import { LoggerMiddleware } from './common/middlewares/logger.middleware';
 
 @Module({
   imports: [
@@ -29,4 +32,8 @@ import { SuccessInterceptor } from './common/interceptors/success.interceptor';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): any {
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+  }
+}

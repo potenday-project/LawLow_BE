@@ -5,6 +5,8 @@ import { LawsModule } from './apis/laws/laws.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { SuccessInterceptor } from './common/interceptors/success.interceptor';
 
 @Module({
   imports: [
@@ -20,6 +22,10 @@ import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SuccessInterceptor,
     },
   ],
 })

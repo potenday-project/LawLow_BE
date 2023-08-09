@@ -12,8 +12,8 @@ import dayjs from 'dayjs';
 interface IResObject {
   success: boolean;
   statusCode: number;
-  message: string | null;
-  detail: string | null;
+  message: string;
+  detail: string;
 }
 interface ILog {
   timestamp: string;

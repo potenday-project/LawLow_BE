@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'lawlow', // pm2 name
-      script: './node_modules/.bin/nest', // 앱 실행 스크립트
-      args: 'start', // 앱 실행 스크립트
+      script: 'dist/main.js', // 앱 실행 스크립트
+      // args: 'start',
       exec_mode: 'cluster', // fork, cluster 모드 중 선택
       watch: false, // 파일이 변경되었을 때 재시작 할지 선택
       instances: '0', // 클러스터 모드 사용 시 생성할 인스턴스 수(max/0은 CPU 수만큼 자동으로 생성)

@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { LawsModule } from './apis/laws/laws.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
-import { HttpExceptionFilter } from './common/http-exception.filter';
+import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 
 @Module({
   imports: [

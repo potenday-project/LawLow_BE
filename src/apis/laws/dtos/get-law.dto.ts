@@ -9,10 +9,10 @@ export class getLawListDto implements SearchRequest {
   @v.IsString()
   readonly q: string;
 
-  @ApiProperty({ required: false, enum: SearchTabEnum, default: SearchTabEnum.PRECEDENT })
-  @v.IsOptional()
-  @v.IsEnum(SearchTabEnum)
-  readonly type: SearchTabEnum = SearchTabEnum.PRECEDENT;
+  // @ApiProperty({ required: false, enum: SearchTabEnum, default: SearchTabEnum.PRECEDENT })
+  // @v.IsOptional()
+  // @v.IsEnum(SearchTabEnum)
+  // readonly type: SearchTabEnum = SearchTabEnum.PRECEDENT;
 
   @ApiProperty({ required: false, default: 1 })
   @v.IsOptional()

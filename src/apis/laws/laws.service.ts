@@ -17,25 +17,33 @@ import {
   TransformedLawList,
 } from 'src/common/types';
 
+interface GetLawListParams {
+  type: SearchTabEnum;
+  q: string;
+  page: number;
+  take: number;
+}
+
 @Injectable()
 export class LawsService {
   constructor(private readonly httpService: HttpService) {}
-  async getLawList(queryParams: getLawListDto): Promise<PageResponse<ResLawData>> {
-    const convertedLaws = await this.fetchConvertedLaws(queryParams);
+  async getLawList(type: SearchTabEnum, queryParams: getLawListDto): Promise<PageResponse<ResLawData>> {
+    const params: GetLawListParams = { type, ...queryParams };
+    const convertedLaws = await this.fetchConvertedLaws(params);
 
     // 검색 결과가 없을 경우
     if (!convertedLaws.PrecSearch?.prec && !convertedLaws.LawSearch?.law) {
       return {
         list: [],
-        ...this.generatePaginationData(convertedLaws, queryParams, 0),
+        ...this.generatePaginationData(convertedLaws, params, 0),
       };
     }
 
     const lawIdList = this.getLawIdList(convertedLaws);
-    const lawDetailList: TransformedLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(queryParams)));
+    const lawDetailList: TransformedLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(params)));
 
-    const paginationData = this.generatePaginationData(convertedLaws, queryParams, lawIdList.length);
-    const responseData = this.generateResponseData(queryParams.type, lawDetailList);
+    const paginationData = this.generatePaginationData(convertedLaws, params, lawIdList.length);
+    const responseData = this.generateResponseData(type, lawDetailList);
 
     return {
       list: responseData,
@@ -43,15 +51,15 @@ export class LawsService {
     };
   }
 
-  private fetchConvertedLaws = async (queryParams: getLawListDto) => {
-    const requestConfig = this.generateRequestConfig(queryParams);
+  private fetchConvertedLaws = async (params: GetLawListParams) => {
+    const requestConfig = this.generateRequestConfig(params);
     const laws = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawSearch.do', requestConfig);
     const convertedLaws = convert.xml2js(laws, { compact: true, nativeType: true }) as LawListResponse;
     return convertedLaws;
   };
 
-  private generateRequestConfig = (queryParams: getLawListDto) => {
-    const { q, type, page, take } = queryParams;
+  private generateRequestConfig = (params: GetLawListParams) => {
+    const { q, type, page, take } = params;
     const sort = type === 'prec' ? 'ddes' : 'efdes';
     return {
       params: {
@@ -67,7 +75,7 @@ export class LawsService {
     };
   };
 
-  private fetchLawDetail = (queryParams: getLawListDto) => async (lawId: number) => {
+  private fetchLawDetail = (queryParams: GetLawListParams) => async (lawId: number) => {
     const requestConfig = this.generateRequestConfig(queryParams);
     const lawDetail = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawService.do', {
       params: {
@@ -121,10 +129,10 @@ export class LawsService {
 
   private generatePaginationData(
     convertedLaws: LawListResponse,
-    queryParams: getLawListDto,
+    params: GetLawListParams,
     currentElementsCount: number,
   ): Omit<PageResponse<TransformedLawList>, 'list'> {
-    const { type, page, take } = queryParams;
+    const { type, page, take } = params;
     const lawListKey = type === 'prec' ? 'PrecSearch' : 'LawSearch';
     const totalCount = convertedLaws[lawListKey].totalCnt._text;
     const totalPages = Math.ceil(totalCount / take);

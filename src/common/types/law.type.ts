@@ -1,3 +1,5 @@
+import { SearchTabEnum } from './search.type';
+
 interface Attributes {
   [key: string]: string;
 }
@@ -42,4 +44,16 @@ interface TransformedDataEntry {
   [key: string]: string | number;
 }
 
-export { LawListResponse, LawDetailResponse, RawLawData, RawDataEntry, TransformedDataEntry };
+interface PrecDetailData {
+  id: number;
+  searchType: SearchTabEnum;
+  incidentTypeName: string;
+  adjudicationType: string;
+  sentencing: string;
+  courtName: string;
+  sentencingDate: string;
+  title: string;
+  content: string;
+}
+
+export { LawListResponse, LawDetailResponse, RawLawData, RawDataEntry, TransformedDataEntry, PrecDetailData };

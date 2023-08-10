@@ -12,6 +12,7 @@ import {
   RawLawData,
   TransformedDataEntry,
   PageResponse,
+  PrecDetailData,
 } from 'src/common/types';
 
 @Injectable()
@@ -19,7 +20,7 @@ export class LawsService {
   constructor(private readonly httpService: HttpService) {}
   async getLawList(
     queryParams: getLawListDto,
-  ): Promise<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[]>> {
+  ): Promise<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[] | PrecDetailData[]>> {
     const convertedLaws = await this.fetchConvertedLaws(queryParams);
 
     // 검색 결과가 없을 경우
@@ -38,17 +39,17 @@ export class LawsService {
     const isLawType = type === SearchTabEnum.LAW;
     const responseData = isLawType
       ? lawDetailList
-      : lawDetailList.map((lawDetail: TransformedDataEntry) => {
+      : lawDetailList.map((lawDetail: TransformedDataEntry): PrecDetailData => {
           return {
-            id: lawDetail.판례정보일련번호,
+            id: lawDetail.판례정보일련번호 as number,
             searchType: queryParams.type,
-            incidentTypeName: lawDetail.사건종류명,
-            adjudicationType: lawDetail.판결유형,
-            sentencing: lawDetail.선고,
-            courtName: lawDetail.법원명,
-            sentencingDate: lawDetail.선고일자.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
-            title: lawDetail.사건명,
-            content: lawDetail.판례내용,
+            incidentTypeName: lawDetail.사건종류명 as string,
+            adjudicationType: lawDetail.판결유형 as string,
+            sentencing: lawDetail.선고 as string,
+            courtName: lawDetail.법원명 as string,
+            sentencingDate: lawDetail.선고일자.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') as string,
+            title: lawDetail.사건명 as string,
+            content: lawDetail.판례내용 as string,
           };
         });
 

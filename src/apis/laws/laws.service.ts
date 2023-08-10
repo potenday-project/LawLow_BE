@@ -12,15 +12,15 @@ import {
   RawLawData,
   TransformedDataEntry,
   PageResponse,
-  PrecDetailData,
+  PrecLawData,
+  ResLawData,
+  TransformedLawList,
 } from 'src/common/types';
 
 @Injectable()
 export class LawsService {
   constructor(private readonly httpService: HttpService) {}
-  async getLawList(
-    queryParams: getLawListDto,
-  ): Promise<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[] | PrecDetailData[]>> {
+  async getLawList(queryParams: getLawListDto): Promise<PageResponse<ResLawData>> {
     const convertedLaws = await this.fetchConvertedLaws(queryParams);
 
     // 검색 결과가 없을 경우
@@ -32,26 +32,10 @@ export class LawsService {
     }
 
     const lawIdList = this.getLawIdList(convertedLaws);
-    const lawDetailList = await Promise.all(lawIdList.map(this.fetchLawDetail(queryParams)));
+    const lawDetailList: TransformedLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(queryParams)));
 
     const paginationData = this.generatePaginationData(convertedLaws, queryParams, lawIdList.length);
-    const { type } = queryParams;
-    const isLawType = type === SearchTabEnum.LAW;
-    const responseData = isLawType
-      ? lawDetailList
-      : lawDetailList.map((lawDetail: TransformedDataEntry): PrecDetailData => {
-          return {
-            id: lawDetail.판례정보일련번호 as number,
-            searchType: queryParams.type,
-            incidentTypeName: lawDetail.사건종류명 as string,
-            adjudicationType: lawDetail.판결유형 as string,
-            sentencing: lawDetail.선고 as string,
-            courtName: lawDetail.법원명 as string,
-            sentencingDate: lawDetail.선고일자.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') as string,
-            title: lawDetail.사건명 as string,
-            content: lawDetail.판례내용 as string,
-          };
-        });
+    const responseData = this.generateResponseData(queryParams.type, lawDetailList);
 
     return {
       list: responseData,
@@ -130,7 +114,7 @@ export class LawsService {
         acc[key] = value;
       }
       return acc;
-    }, {} as TransformedDataEntry | TransformedDataEntry[]);
+    }, {} as TransformedDataEntry[]);
 
     return transformedData;
   };
@@ -139,7 +123,7 @@ export class LawsService {
     convertedLaws: LawListResponse,
     queryParams: getLawListDto,
     currentElementsCount: number,
-  ): Omit<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[]>, 'list'> {
+  ): Omit<PageResponse<TransformedLawList>, 'list'> {
     const { type, page, take } = queryParams;
     const lawListKey = type === 'prec' ? 'PrecSearch' : 'LawSearch';
     const totalCount = convertedLaws[lawListKey].totalCnt._text;
@@ -154,5 +138,27 @@ export class LawsService {
       totalPages: totalPages,
       currentPage: page,
     };
+  }
+
+  private generateResponseData(type: SearchTabEnum, lawDetailList: TransformedLawList): ResLawData {
+    const isLawType = type === SearchTabEnum.LAW;
+    if (isLawType) {
+      return lawDetailList;
+    }
+
+    return lawDetailList.map((lawDetail: PrecLawData) => {
+      return {
+        id: lawDetail.판례정보일련번호,
+        searchType: type,
+        incidentNumber: lawDetail.사건번호,
+        incidentTypeName: lawDetail.사건종류명,
+        adjudicationType: lawDetail.판결유형,
+        sentencing: lawDetail.선고,
+        courtName: lawDetail.법원명,
+        sentencingDate: lawDetail.선고일자.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'), // YYYYMMDD -> YYYY-MM-DD
+        title: lawDetail.사건명,
+        content: lawDetail.판례내용,
+      };
+    });
   }
 }

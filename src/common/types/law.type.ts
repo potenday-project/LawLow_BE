@@ -41,13 +41,14 @@ interface LawListResponse {
 }
 
 interface TransformedDataEntry {
-  [key: string]: string | number;
+  [key: string]: string | number | TransformedDataEntry[] | TransformedDataEntry;
 }
 
 interface PrecDetailData {
   id: number;
   searchType: SearchTabEnum;
   incidentTypeName: string;
+  incidentNumber: string;
   adjudicationType: string;
   sentencing: string;
   courtName: string;
@@ -56,4 +57,29 @@ interface PrecDetailData {
   content: string;
 }
 
-export { LawListResponse, LawDetailResponse, RawLawData, RawDataEntry, TransformedDataEntry, PrecDetailData };
+interface PrecLawData extends TransformedDataEntry {
+  판례정보일련번호: number;
+  사건번호: string;
+  사건종류명: string;
+  판결유형: string;
+  선고: string;
+  법원명: string;
+  선고일자: string;
+  사건명: string;
+  판례내용: string;
+}
+
+type TransformedLawList = (TransformedDataEntry | TransformedDataEntry[])[];
+type ResLawData = TransformedLawList | PrecDetailData[];
+
+export {
+  LawListResponse,
+  LawDetailResponse,
+  RawLawData,
+  RawDataEntry,
+  TransformedDataEntry,
+  PrecDetailData,
+  ResLawData,
+  PrecLawData,
+  TransformedLawList,
+};

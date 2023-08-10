@@ -3,7 +3,7 @@ import { LawsService } from './laws.service';
 import { Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
-import { TransformedDataEntry, PageResponse, PrecDetailData } from 'src/common/types';
+import { PageResponse, ResLawData } from 'src/common/types';
 
 @Controller('laws')
 @ApiTags('Laws')
@@ -12,9 +12,7 @@ export class LawsController {
 
   @Get()
   @ApiOperation({ summary: '판례/법령 목록 조회' })
-  getLawList(
-    @Query() queryParams: getLawListDto,
-  ): Promise<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[] | PrecDetailData[]>> {
+  getLawList(@Query() queryParams: getLawListDto): Promise<PageResponse<ResLawData>> {
     return this.lawsService.getLawList(queryParams);
   }
 }

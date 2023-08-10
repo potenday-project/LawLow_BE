@@ -1,15 +1,20 @@
-import { Controller } from '@nestjs/common';
+import { Controller, Query } from '@nestjs/common';
 import { LawsService } from './laws.service';
 import { Get } from '@nestjs/common';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { getLawListDto } from './dtos/get-law.dto';
+import { TransformedDataEntry, PageResponse } from 'src/common/types';
 
 @Controller('laws')
+@ApiTags('Laws')
 export class LawsController {
   constructor(private readonly lawsService: LawsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get laws' })
-  getLaws() {
-    return this.lawsService.getLaws();
+  @ApiOperation({ summary: '판례/법령 목록 조회' })
+  getLawList(
+    @Query() queryParams: getLawListDto,
+  ): Promise<PageResponse<(TransformedDataEntry | TransformedDataEntry[])[]>> {
+    return this.lawsService.getLawList(queryParams);
   }
 }

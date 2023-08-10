@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LawsModule } from './apis/laws/laws.module';
+import { LawModule } from './apis/laws/laws.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
@@ -17,7 +17,7 @@ import { LoggerMiddleware } from './common/middlewares/logger.middleware';
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV}`,
     }),
-    LawsModule,
+    LawModule,
   ],
   controllers: [AppController],
   providers: [

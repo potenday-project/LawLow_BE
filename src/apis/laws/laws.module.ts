@@ -8,4 +8,4 @@ import { HttpModule } from '@nestjs/axios';
   controllers: [LawsController],
   providers: [LawsService],
 })
-export class LawsModule {}
+export class LawModule {}

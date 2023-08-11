@@ -1,25 +1,13 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-
-type DataValueType = string | number | object;
-
-interface ICommonData {
-  data?: DataValueType;
-  [key: string]: DataValueType | boolean;
-}
-interface IData extends ICommonData {
-  success?: boolean;
-}
-interface IResult extends ICommonData {
-  success: boolean;
-}
+import { CommonResponse } from '../types';
 
 @Injectable()
 export class SuccessInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<IResult> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<CommonResponse> {
     return next.handle().pipe(
-      map((data: IData | boolean) => {
+      map((data: CommonResponse | boolean) => {
         if (typeof data === 'boolean') {
           return { success: data };
         }
@@ -33,13 +21,13 @@ export class SuccessInterceptor implements NestInterceptor {
           return {
             success: success ?? true,
             ...data,
-          } as IResult;
+          } as CommonResponse;
         }
 
         return {
           success: success ?? true,
           data: data,
-        } as IResult;
+        } as CommonResponse;
       }),
     );
   }

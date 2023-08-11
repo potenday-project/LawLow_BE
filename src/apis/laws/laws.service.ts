@@ -6,16 +6,16 @@ import { getLawListDto } from './dtos/get-law.dto';
 import {
   SearchRangeEnum,
   SearchTabEnum,
-  LawDetailResponse,
-  LawListResponse,
+  RawLawDetailRes,
+  LawListApiResponse,
   RawDataEntry,
   RawLawData,
-  TransformedDataEntry,
+  TransformedCleanDataEntry,
+  TransformedCleanLawList,
   PageResponse,
-  PrecLawData,
-  ResLawData,
-  TransformedLawList,
   PrecDetailData,
+  LawDetailData,
+  LawArticle,
 } from 'src/common/types';
 
 interface GetLawListParams {
@@ -28,7 +28,11 @@ interface GetLawListParams {
 @Injectable()
 export class LawsService {
   constructor(private readonly httpService: HttpService) {}
-  async getLawList(type: SearchTabEnum, queryParams: getLawListDto): Promise<PageResponse<ResLawData>> {
+
+  async getLawList(
+    type: SearchTabEnum,
+    queryParams: getLawListDto,
+  ): Promise<PageResponse<LawDetailData[] | PrecDetailData[]>> {
     const params: GetLawListParams = { type, ...queryParams };
     const convertedLaws = await this.fetchConvertedLaws(params);
 
@@ -41,7 +45,7 @@ export class LawsService {
     }
 
     const lawIdList = this.getLawIdList(convertedLaws);
-    const lawDetailList: TransformedLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(params)));
+    const lawDetailList: TransformedCleanLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(params)));
 
     const paginationData = this.generatePaginationData(convertedLaws, params, lawIdList.length);
     const responseData = this.generateResponseData(type, lawDetailList);
@@ -55,7 +59,7 @@ export class LawsService {
   private fetchConvertedLaws = async (params: GetLawListParams) => {
     const requestConfig = this.generateRequestConfig(params);
     const laws = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawSearch.do', requestConfig);
-    const convertedLaws = convert.xml2js(laws, { compact: true, nativeType: true }) as LawListResponse;
+    const convertedLaws = convert.xml2js(laws, { compact: true, nativeType: true }) as LawListApiResponse;
     return convertedLaws;
   };
 
@@ -84,13 +88,13 @@ export class LawsService {
         ID: lawId,
       },
     });
-    const convertedLawDetail = convert.xml2js(lawDetail, { compact: true, nativeType: true }) as LawDetailResponse;
+    const convertedLawDetail = convert.xml2js(lawDetail, { compact: true, nativeType: true }) as RawLawDetailRes;
     const detailKey = queryParams.type === 'prec' ? 'PrecService' : '법령';
 
-    return this.transformLawData(convertedLawDetail[detailKey]);
+    return this.transformCleanLawData(convertedLawDetail[detailKey]);
   };
 
-  private getLawIdList(lawList: LawListResponse): number[] {
+  private getLawIdList(lawList: LawListApiResponse): number[] {
     if (lawList.PrecSearch) {
       if (Array.isArray(lawList.PrecSearch.prec)) {
         return lawList.PrecSearch.prec.map((prec) => prec.판례일련번호._text);
@@ -108,9 +112,11 @@ export class LawsService {
     return [];
   }
 
-  private transformLawData = (rawData: RawLawData | RawDataEntry): TransformedDataEntry | TransformedDataEntry[] => {
+  private transformCleanLawData = (
+    rawData: RawLawData | RawDataEntry,
+  ): TransformedCleanDataEntry | TransformedCleanDataEntry[] => {
     if (Array.isArray(rawData)) {
-      return rawData.map((item: RawLawData) => this.transformLawData(item)) as TransformedDataEntry[]; // 재귀 호출
+      return rawData.map((item: RawLawData) => this.transformCleanLawData(item)) as TransformedCleanDataEntry[]; // 재귀 호출
     }
     const transformedData = Object.entries(rawData).reduce((acc, [key, value]) => {
       if (value['_text'] || typeof value['_text'] === 'number') {
@@ -118,21 +124,21 @@ export class LawsService {
       } else if (value['_cdata']) {
         acc[key] = value['_cdata'];
       } else if (typeof value === 'object' && value !== null) {
-        acc[key] = this.transformLawData(value); // 재귀 호출
+        acc[key] = this.transformCleanLawData(value); // 재귀 호출
       } else {
         acc[key] = value;
       }
       return acc;
-    }, {} as TransformedDataEntry[]);
+    }, {} as TransformedCleanDataEntry[]);
 
     return transformedData;
   };
 
   private generatePaginationData(
-    convertedLaws: LawListResponse,
+    convertedLaws: LawListApiResponse,
     params: GetLawListParams,
     currentElementsCount: number,
-  ): Omit<PageResponse<TransformedLawList>, 'list'> {
+  ): Omit<PageResponse<TransformedCleanLawList>, 'list'> {
     const { type, page, take } = params;
     const lawListKey = type === 'prec' ? 'PrecSearch' : 'LawSearch';
     const totalCount = convertedLaws[lawListKey].totalCnt._text;
@@ -149,24 +155,63 @@ export class LawsService {
     };
   }
 
-  private generateResponseData(type: SearchTabEnum, lawDetailList: TransformedLawList): ResLawData {
-    const isLawType = type === SearchTabEnum.LAW;
-    if (isLawType) {
-      return lawDetailList;
+  private generateResponseData(
+    type: SearchTabEnum,
+    lawDetailList: TransformedCleanLawList,
+  ): LawDetailData[] | PrecDetailData[] {
+    if (type === SearchTabEnum.LAW) {
+      return lawDetailList.map((lawDetail: TransformedCleanDataEntry): LawDetailData => {
+        const lawDetailTyped = lawDetail as unknown as LawDetailData;
+        const lawArticle = this.transformLawArticle(lawDetailTyped.조문.조문단위);
+        return {
+          기본정보: {
+            법령명: String(lawDetailTyped.기본정보.법령명_한글),
+            시행일자: Number(lawDetailTyped.기본정보.시행일자),
+          },
+          조문: {
+            조문단위: lawArticle,
+          },
+          부칙: {
+            부칙단위: lawDetailTyped.부칙.부칙단위,
+          },
+        };
+      });
     }
 
-    return lawDetailList.map((lawDetail: PrecLawData): PrecDetailData => {
+    return lawDetailList.map((precDetail: TransformedCleanDataEntry): PrecDetailData => {
+      const lawDetailTyped = precDetail as unknown as PrecDetailData;
       return {
-        판례정보일련번호: lawDetail.판례정보일련번호,
-        사건번호: lawDetail.사건번호,
-        사건종류명: lawDetail.사건종류명,
-        판결유형: lawDetail.판결유형,
-        선고: lawDetail.선고,
-        법원명: lawDetail.법원명,
-        선고일자: lawDetail.선고일자,
-        사건명: lawDetail.사건명,
-        판례내용: lawDetail.판례내용,
+        판례정보일련번호: Number(lawDetailTyped.판례정보일련번호),
+        사건번호: String(lawDetailTyped.사건번호),
+        사건종류명: String(lawDetailTyped.사건종류명),
+        판결유형: String(lawDetailTyped.판결유형),
+        선고: String(lawDetailTyped.선고),
+        법원명: String(lawDetailTyped.법원명),
+        선고일자: String(lawDetailTyped.선고일자),
+        사건명: String(lawDetailTyped.사건명),
+        판례내용: String(lawDetailTyped.판례내용),
       };
     });
+  }
+
+  private transformLawArticle(lawArticleData: LawArticle | LawArticle[]): LawArticle | LawArticle[] {
+    const transformSingleArticle = (article: LawArticle) => {
+      return {
+        조문키: article._attributes.조문키,
+        조문번호: article.조문번호,
+        조문여부: article.조문여부,
+        조문제목: article.조문제목,
+        조문시행일자: article.조문시행일자,
+        조문내용: article.조문내용,
+        항: article.항,
+        조문참고자료: article.조문참고자료,
+      };
+    };
+
+    if (Array.isArray(lawArticleData)) {
+      return lawArticleData.map(transformSingleArticle);
+    } else {
+      return transformSingleArticle(lawArticleData);
+    }
   }
 }

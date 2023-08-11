@@ -8,18 +8,13 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import dayjs from 'dayjs';
+import { CommonResponse } from '../types';
 
-interface IResObject {
-  success: boolean;
-  statusCode: number;
-  message: string;
-  detail: string;
-}
-interface ILog {
+interface Log {
   timestamp: string;
   method: string;
   url: string;
-  res: IResObject;
+  res: CommonResponse;
 }
 type Err = string | { message?: string; error?: string };
 
@@ -39,7 +34,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const err: Err = (exception as HttpException).getResponse();
 
     const statusCode = (exception as HttpException).getStatus();
-    const resObject: IResObject = {
+    const resObject: CommonResponse = {
       success: false,
       statusCode,
       message: typeof err === 'string' ? err : err.message ?? exception.message ?? null,
@@ -59,8 +54,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return null;
   }
 
-  private logErrorOrWarning(exception: HttpException | Error, resObject: IResObject, request: Request): void {
-    const log: ILog = {
+  private logErrorOrWarning(exception: HttpException | Error, resObject: CommonResponse, request: Request): void {
+    const log: Log = {
       timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss'),
       method: request.method,
       url: request.url,

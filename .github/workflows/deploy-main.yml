@@ -46,7 +46,7 @@ jobs:
             source ~/.nvm/nvm.sh
             yarn install
             yarn build
-            pm2 reload all
+            pm2 reload all --update-env
 
 # TODO: Build the project and scp to the server.
 # TODO: Obtaining the IP address of the GitHub Actions and temporarily adding it to the AWS security group's inbound rules for SSH.

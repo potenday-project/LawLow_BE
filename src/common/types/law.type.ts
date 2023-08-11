@@ -54,7 +54,7 @@ interface LawParagraph {
 }
 interface LawArticle {
   _attributes?: {
-    조문키: string;
+    조문키: string; // 반환값에는 없는데, API에서는 있음
   };
   조문키: string;
   조문번호: number;
@@ -73,7 +73,8 @@ interface LawAddendum {
 }
 interface LawDetailData {
   기본정보: {
-    법령명_한글?: string;
+    법령ID: number;
+    법령명_한글?: string; // 반환값에는 없는데, API에서는 있음
     법령명: string;
     시행일자: number;
   };

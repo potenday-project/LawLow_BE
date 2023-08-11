@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
@@ -45,7 +45,8 @@ export class LawsService {
     }
 
     const lawIdList = this.getLawIdList(convertedLaws);
-    const lawDetailList: TransformedCleanLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(params)));
+    const requestConfig = this.generateRequestConfig(params);
+    const lawDetailList: TransformedCleanLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(requestConfig)));
 
     const paginationData = this.generatePaginationData(convertedLaws, params, lawIdList.length);
     const responseData = this.generateResponseData(type, lawDetailList);
@@ -63,7 +64,7 @@ export class LawsService {
     return convertedLaws;
   };
 
-  private generateRequestConfig = (params: GetLawListParams) => {
+  private generateRequestConfig = (params: Partial<GetLawListParams>) => {
     const { q, type, page, take } = params;
     const sort = type === 'prec' ? 'ddes' : 'efdes';
     return {
@@ -80,19 +81,25 @@ export class LawsService {
     };
   };
 
-  private fetchLawDetail = (queryParams: GetLawListParams) => async (lawId: number) => {
-    const requestConfig = this.generateRequestConfig(queryParams);
-    const lawDetail = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawService.do', {
-      params: {
-        ...requestConfig.params,
-        ID: lawId,
-      },
-    });
-    const convertedLawDetail = convert.xml2js(lawDetail, { compact: true, nativeType: true }) as RawLawDetailRes;
-    const detailKey = queryParams.type === 'prec' ? 'PrecService' : '법령';
+  private fetchLawDetail =
+    (requestConfig: ReturnType<typeof this.generateRequestConfig>) =>
+    async (lawId: number): Promise<TransformedCleanDataEntry | TransformedCleanDataEntry[]> => {
+      const lawDetail = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawService.do', {
+        params: {
+          ID: lawId,
+          ...requestConfig.params,
+        },
+      });
+      const convertedLawDetail = convert.xml2js(lawDetail, { compact: true, nativeType: true }) as RawLawDetailRes;
 
-    return this.transformCleanLawData(convertedLawDetail[detailKey]);
-  };
+      const detailKey = requestConfig.params.target === 'prec' ? 'PrecService' : '법령';
+      const detailData = convertedLawDetail[detailKey];
+      if (!detailData) {
+        return null;
+      }
+
+      return this.transformCleanLawData(detailData);
+    };
 
   private getLawIdList(lawList: LawListApiResponse): number[] {
     if (lawList.PrecSearch) {
@@ -165,6 +172,7 @@ export class LawsService {
         const lawArticle = this.transformLawArticle(lawDetailTyped.조문.조문단위);
         return {
           기본정보: {
+            법령ID: Number(lawDetailTyped.기본정보.법령ID),
             법령명: String(lawDetailTyped.기본정보.법령명_한글),
             시행일자: Number(lawDetailTyped.기본정보.시행일자),
           },
@@ -213,5 +221,19 @@ export class LawsService {
     } else {
       return transformSingleArticle(lawArticleData);
     }
+  }
+
+  async getLawDetail(type: SearchTabEnum, id: number): Promise<LawDetailData | PrecDetailData> {
+    const params = {
+      type,
+    };
+    const requestConfig = this.generateRequestConfig(params);
+    const lawDetailList = await Promise.all([id].map(this.fetchLawDetail(requestConfig)));
+    if (!lawDetailList[0]) {
+      throw new NotFoundException(`해당하는 ${type === 'prec' ? '판례가' : '법령이'} 없습니다.`);
+    }
+    const responseData = this.generateResponseData(type, lawDetailList);
+
+    return responseData[0];
   }
 }

@@ -26,13 +26,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
+    const stack = exception.stack;
 
     if (!(exception instanceof HttpException)) {
       exception = new InternalServerErrorException(exception.message);
     }
 
     const err: Err = (exception as HttpException).getResponse();
-
     const statusCode = (exception as HttpException).getStatus();
     const resObject: CommonResponse = {
       success: false,
@@ -41,7 +41,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       detail: this.getDetail(exception, err, req),
     };
 
-    this.logErrorOrWarning(exception, resObject, req);
+    this.logErrorOrWarning(stack, resObject, req);
 
     response.status(statusCode).json(resObject);
   }
@@ -54,19 +54,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return null;
   }
 
-  private logErrorOrWarning(exception: HttpException | Error, resObject: CommonResponse, request: Request): void {
+  private logErrorOrWarning(stack: string, resObject: CommonResponse, request: Request): void {
     const log: Log = {
       timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss'),
       method: request.method,
       url: request.url,
       res: resObject,
     };
-    const stack = exception.stack;
 
     if (resObject.statusCode >= 500) {
       this.logger.error(log, stack);
     } else {
-      this.logger.warn(log, stack);
+      this.logger.debug(log, stack);
     }
   }
 }

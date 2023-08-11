@@ -1,8 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import convert from 'xml-js';
-import { fetchData } from 'src/common/utils';
-import { getLawListDto } from './dtos/get-law.dto';
+import { ConfigService } from '@nestjs/config';
 import {
   SearchRangeEnum,
   SearchTabEnum,
@@ -17,6 +13,13 @@ import {
   LawDetailData,
   LawArticle,
 } from 'src/common/types';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import convert from 'xml-js';
+import { fetchData } from 'src/common/utils';
+import { getLawListDto } from './dtos/get-law.dto';
+import { OpenaiService } from 'src/shared/services/openai.service';
+import { ChatCompletionRequestMessage } from 'openai';
 
 interface GetLawListParams {
   type: SearchTabEnum;
@@ -27,7 +30,11 @@ interface GetLawListParams {
 
 @Injectable()
 export class LawsService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+    private readonly openAiService: OpenaiService,
+  ) {}
 
   async getLawList(
     type: SearchTabEnum,
@@ -69,7 +76,7 @@ export class LawsService {
     const sort = type === 'prec' ? 'ddes' : 'efdes';
     return {
       params: {
-        OC: 'rjsgmldnwn',
+        OC: this.configService.get('LAW_OPEN_API_OC'),
         target: type,
         search: SearchRangeEnum.CONTENT,
         query: q,
@@ -235,5 +242,45 @@ export class LawsService {
     const responseData = this.generateResponseData(type, lawDetailList);
 
     return responseData[0];
+  }
+
+  async createLawSummary(type: SearchTabEnum, id: number, assistantMessages: string): Promise<string> {
+    const initContent = this.configService.get('LAW_SUMMARY_INIT_PROMPT');
+    const messages: Array<ChatCompletionRequestMessage> = [
+      {
+        role: 'system',
+        content: initContent,
+      },
+    ];
+
+    const lawDetail = await this.getLawDetail(type, id);
+    let content: string;
+    if ('판례내용' in lawDetail) {
+      content = lawDetail.판례내용.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n|\r/g, ''); // html 태그, 엔터티, 줄바꿈 제거
+    } else {
+      content = JSON.stringify(lawDetail);
+    }
+    const requestType = type === 'prec' ? '판례' : '법령';
+
+    messages.push({
+      role: 'user',
+      content: `${requestType} 내용 중학생도 이해하기 쉽게 요약 설명 부탁해. ${content}`,
+    });
+
+    if (assistantMessages) {
+      messages.push({
+        role: 'assistant',
+        content: assistantMessages.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n/g, ''),
+      });
+      messages.push({
+        role: 'user',
+        content: '더 쉽게 설명 부탁해.',
+      });
+    }
+
+    const summary = await this.openAiService.createAIChatCompletion(messages);
+    const summaryContent = summary.data.choices[0].message?.content;
+
+    return summaryContent;
   }
 }

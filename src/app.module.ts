@@ -9,6 +9,7 @@ import { SuccessInterceptor } from './common/interceptors/success.interceptor';
 import { NestModule } from '@nestjs/common';
 import { MiddlewareConsumer } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
+import { SharedModule } from './shared/shared.module';
 
 @Module({
   imports: [
@@ -16,8 +17,9 @@ import { LoggerMiddleware } from './common/middlewares/logger.middleware';
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV}`,
     }),
-    HealthCheckerModule,
     LawModule,
+    SharedModule,
+    HealthCheckerModule,
   ],
   providers: [
     {

@@ -13,11 +13,13 @@ export class getLawListDto implements SearchRequest {
   @v.IsOptional()
   @Transform(({ value }) => Number(value))
   @v.IsInt()
+  @v.Min(1)
   readonly page: number = 1;
 
   @ApiProperty({ required: false, default: 10 })
   @v.IsOptional()
   @Transform(({ value }) => Number(value))
   @v.IsInt()
+  @v.Min(1)
   readonly take: number = 10;
 }

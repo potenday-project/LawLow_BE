@@ -8,5 +8,5 @@ export class RequestSummaryDto {
   })
   @v.IsOptional()
   @v.IsString()
-  readonly recentAssistMsg?: string;
+  readonly recentSummaryMsg?: string;
 }

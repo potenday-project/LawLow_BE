@@ -73,6 +73,6 @@ export class LawsController {
     @Param('id') id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
   ): Promise<string> {
-    return this.lawsService.createLawSummary(type, id, requestSummaryDto.recentAssistMsg);
+    return this.lawsService.createLawSummary(type, id, requestSummaryDto.recentSummaryMsg);
   }
 }

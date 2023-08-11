@@ -31,7 +31,7 @@
     "class-validator": "^0.14.0",
     "dayjs": "^1.11.9",
     "express-basic-auth": "^1.2.1",
-    "openai": "^3.3.0",
+    "openai": "^4.0.0-beta.9",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "xml-js": "^1.6.11"

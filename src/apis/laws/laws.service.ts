@@ -19,7 +19,6 @@ import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
 import { getLawListDto } from './dtos/get-law.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
-import { ChatCompletionRequestMessage } from 'openai';
 
 interface GetLawListParams {
   type: SearchTabEnum;
@@ -244,9 +243,9 @@ export class LawsService {
     return responseData[0];
   }
 
-  async createLawSummary(type: SearchTabEnum, id: number, assistantMessages: string): Promise<string> {
+  async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<string> {
     const initContent = this.configService.get('LAW_SUMMARY_INIT_PROMPT');
-    const messages: Array<ChatCompletionRequestMessage> = [
+    const messages = [
       {
         role: 'system',
         content: initContent,
@@ -267,10 +266,10 @@ export class LawsService {
       content: `${requestType} 내용 중학생도 이해하기 쉽게 요약 설명 부탁해. ${content}`,
     });
 
-    if (assistantMessages) {
+    if (recentSummaryMsg) {
       messages.push({
         role: 'assistant',
-        content: assistantMessages.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n/g, ''),
+        content: recentSummaryMsg.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n/g, ''),
       });
       messages.push({
         role: 'user',
@@ -279,7 +278,7 @@ export class LawsService {
     }
 
     const summary = await this.openAiService.createAIChatCompletion(messages);
-    const summaryContent = summary.data.choices[0].message?.content;
+    const summaryContent = summary.choices[0].message.content;
 
     return summaryContent;
   }

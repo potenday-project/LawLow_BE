@@ -1,36 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import {
-  Configuration,
-  OpenAIApi,
-  CreateChatCompletionRequest,
-  CreateChatCompletionResponse,
-  ChatCompletionRequestMessage,
-} from 'openai';
+import { OpenAI } from 'openai';
 import { ConfigService } from '@nestjs/config';
-import { AxiosResponse } from 'openai/node_modules/axios';
 
 @Injectable()
 export class OpenaiService {
-  private openai: OpenAIApi;
+  private openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
-    const configuration = new Configuration({
+    this.openai = new OpenAI({
       apiKey: this.configService.get('OPENAI_API_KEY'),
-    });
-    this.openai = new OpenAIApi(configuration); // singleton
+    }); // singleton
   }
 
-  // TODO: gpt token 제한으로 인해, 요청 크기가 커지면 에러 발생함.
-  // TODO: 이를 해결하기 위해, token 계산 후 요청을 나눠서 보내는 방법 등을 고려해야 할 것 같음.
-  async createAIChatCompletion(
-    messages: Array<ChatCompletionRequestMessage>,
-  ): Promise<AxiosResponse<CreateChatCompletionResponse>> {
-    const requestData: CreateChatCompletionRequest = {
-      model: 'gpt-3.5-turbo',
+  // TODO: 현재 사용하는 gpt 모델의 maximun context length 제한이 16385 token이라서, 요청 크기가 커지면 에러 발생함.
+  // TODO: 이를 해결하기 위해, token 계산 후 요청을 나눠서 보내는 방법 등을 고려해야 할 것으로 보임.
+  async createAIChatCompletion(messages): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    const requestData = {
+      model: 'gpt-3.5-turbo-16k-0613',
       messages,
     };
-    const completion = await this.openai.createChatCompletion(requestData);
+    const chatCompletion = await this.openai.chat.completions.create(requestData);
 
-    return completion;
+    return chatCompletion;
   }
 }

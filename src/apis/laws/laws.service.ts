@@ -15,6 +15,7 @@ import {
   PrecLawData,
   ResLawData,
   TransformedLawList,
+  PrecDetailData,
 } from 'src/common/types';
 
 interface GetLawListParams {
@@ -154,18 +155,17 @@ export class LawsService {
       return lawDetailList;
     }
 
-    return lawDetailList.map((lawDetail: PrecLawData) => {
+    return lawDetailList.map((lawDetail: PrecLawData): PrecDetailData => {
       return {
-        id: lawDetail.판례정보일련번호,
-        searchType: type,
-        incidentNumber: lawDetail.사건번호,
-        incidentTypeName: lawDetail.사건종류명,
-        adjudicationType: lawDetail.판결유형,
-        sentencing: lawDetail.선고,
-        courtName: lawDetail.법원명,
-        sentencingDate: lawDetail.선고일자.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'), // YYYYMMDD -> YYYY-MM-DD
-        title: lawDetail.사건명,
-        content: lawDetail.판례내용,
+        판례정보일련번호: lawDetail.판례정보일련번호,
+        사건번호: lawDetail.사건번호,
+        사건종류명: lawDetail.사건종류명,
+        판결유형: lawDetail.판결유형,
+        선고: lawDetail.선고,
+        법원명: lawDetail.법원명,
+        선고일자: lawDetail.선고일자,
+        사건명: lawDetail.사건명,
+        판례내용: lawDetail.판례내용,
       };
     });
   }

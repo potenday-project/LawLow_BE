@@ -45,16 +45,15 @@ interface TransformedDataEntry {
 }
 
 interface PrecDetailData {
-  id: number;
-  searchType: SearchTabEnum;
-  incidentTypeName: string;
-  incidentNumber: string;
-  adjudicationType: string;
-  sentencing: string;
-  courtName: string;
-  sentencingDate: string;
-  title: string;
-  content: string;
+  판례정보일련번호: number;
+  사건번호: string;
+  사건종류명: string;
+  판결유형: string;
+  선고: string;
+  법원명: string;
+  선고일자: string;
+  사건명: string;
+  판례내용: string;
 }
 
 interface PrecLawData extends TransformedDataEntry {

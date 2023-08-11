@@ -9,11 +9,12 @@ import { PageResponse, ResLawData, SearchTabEnum } from 'src/common/types';
 export class LawsController {
   constructor(private readonly lawsService: LawsService) {}
 
-  @Get()
+  @Get(':type')
   @ApiOperation({ summary: '판례/법령 목록 조회' })
   @ApiParam({
     name: 'type',
     enum: SearchTabEnum,
+    description: 'prec: 판례, law: 법령',
   })
   getLawList(
     @Param('type', new ParseEnumPipe(SearchTabEnum))

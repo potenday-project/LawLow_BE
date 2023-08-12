@@ -1,4 +1,4 @@
-import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body } from '@nestjs/common';
+import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body, ParseIntPipe } from '@nestjs/common';
 import { LawsService } from './laws.service';
 import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
@@ -46,7 +46,7 @@ export class LawsController {
   getLawDetail(
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
-    @Param('id') id: number,
+    @Param('id', new ParseIntPipe()) id: number,
   ): Promise<StatuteDetailData | PrecDetailData> {
     return this.lawsService.getLawDetail(type, id);
   }

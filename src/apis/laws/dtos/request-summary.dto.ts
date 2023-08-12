@@ -3,10 +3,12 @@ import * as v from 'class-validator';
 
 export class RequestSummaryDto {
   @ApiProperty({
-    required: false,
-    example: '최근에 제공받은 판례/법령의 요지를 요약한 문장을 입력합니다.',
+    description: '직전에 제공받은 요약문을 입력합니다.',
+    type: String,
+    nullable: true,
+    default: null,
   })
   @v.IsOptional()
   @v.IsString()
-  readonly recentSummaryMsg?: string;
+  recentSummaryMsg?: string;
 }

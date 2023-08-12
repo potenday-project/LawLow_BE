@@ -1,6 +1,6 @@
 import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body } from '@nestjs/common';
 import { LawsService } from './laws.service';
-import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse, ApiResponseOptions } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
 import { RequestSummaryDto } from './dtos/request-summary.dto';
 import {
@@ -67,9 +67,31 @@ export class LawsController {
     description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
   })
   @ApiBody({
-    type: RequestSummaryDto,
+    examples: {
+      '최초 요약 요청': {
+        value: {
+          recentSummaryMsg: null,
+        },
+        description: '최초 요약 요청',
+      },
+      '더 쉽게 해석': {
+        value: {
+          recentSummaryMsg: '직전에 제공받았던 요약문',
+        },
+        description: '더 쉽게 해석 요청',
+      },
+    },
+    schema: {
+      properties: {
+        recentSummaryMsg: {
+          type: 'string',
+          nullable: true,
+          description: '직전에 제공받은 요약문',
+        },
+      },
+    },
     required: false,
-    description: 'assistantMessages: 기존에 제공받았던 요약문 목록',
+    description: 'assistantMessages: 직전에 제공받은 요약문을 입력합니다.',
   })
   @ApiResponse({
     status: 201,
@@ -99,26 +121,30 @@ export class LawsController {
           },
         },
         schema: {
-          type: 'object',
-          properties: {
-            easyTitle: {
-              type: 'string',
-              nullable: true,
-              description: '쉬운 제목',
-            },
-            summary: {
-              type: 'string',
-              description: '요약문',
-            },
-            keywords: {
-              type: 'array',
-              nullable: true,
-              items: {
-                type: 'string',
+          oneOf: [
+            {
+              type: 'object',
+              properties: {
+                easyTitle: {
+                  type: 'string',
+                  nullable: true,
+                  description: '쉬운 제목',
+                },
+                summary: {
+                  type: 'string',
+                  description: '요약문',
+                },
+                keywords: {
+                  type: 'array',
+                  nullable: true,
+                  items: {
+                    type: 'string',
+                  },
+                  description: '키워드 목록',
+                },
               },
-              description: '키워드 목록',
             },
-          },
+          ],
         },
       },
     },

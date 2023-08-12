@@ -20,7 +20,7 @@ interface CommonConvertedElement<T> {
 interface ConvertedPrecElement {
   판례일련번호: CommonConvertedElement<number>;
 }
-interface ConvertedLawElement {
+interface ConvertedStatuteElement {
   법령ID: CommonConvertedElement<number>;
 }
 interface LawListApiResponse {
@@ -30,7 +30,7 @@ interface LawListApiResponse {
   };
   LawSearch?: {
     totalCnt: CommonConvertedElement<number>;
-    law: ConvertedLawElement[] | ConvertedLawElement;
+    law: ConvertedStatuteElement[] | ConvertedStatuteElement;
   };
 }
 
@@ -38,21 +38,21 @@ interface TransformedCleanDataEntry {
   [key: string]: string | number | TransformedCleanDataEntry[] | TransformedCleanDataEntry;
 }
 
-interface Lawitem {
+interface Statuteitem {
   목번호: string;
   목내용: string;
 }
-interface LawSubparagraph {
+interface StatuteSubparagraph {
   호번호: string;
   호내용: string;
-  목?: Lawitem | Lawitem[];
+  목?: Statuteitem | Statuteitem[];
 }
-interface LawParagraph {
+interface StatuteParagraph {
   항번호: string;
   항내용: string;
-  호?: LawSubparagraph | LawSubparagraph[];
+  호?: StatuteSubparagraph | StatuteSubparagraph[];
 }
-interface LawArticle {
+interface StatuteArticle {
   _attributes?: {
     조문키: string; // 반환값에는 없는데, API에서는 있음
   };
@@ -62,16 +62,16 @@ interface LawArticle {
   조문제목?: string;
   조문시행일자: number;
   조문내용: string;
-  항?: LawParagraph | LawParagraph[];
+  항?: StatuteParagraph | StatuteParagraph[];
   조문참고자료?: string | string[];
 }
-interface LawAddendum {
+interface StatuteAddendum {
   부칙키: string;
   부칙공포일자: number;
   부칙공포번호: number;
   부칙내용: string[];
 }
-interface LawDetailData {
+interface StatuteDetailData {
   기본정보: {
     법령ID: number;
     법령명_한글?: string; // 반환값에는 없는데, API에서는 있음
@@ -79,10 +79,10 @@ interface LawDetailData {
     시행일자: number;
   };
   조문: {
-    조문단위: LawArticle | LawArticle[];
+    조문단위: StatuteArticle | StatuteArticle[];
   };
   부칙: {
-    부칙단위: LawAddendum | LawAddendum[];
+    부칙단위: StatuteAddendum | StatuteAddendum[];
   };
 }
 
@@ -108,6 +108,6 @@ export {
   TransformedCleanDataEntry,
   PrecDetailData,
   TransformedCleanLawList,
-  LawDetailData,
-  LawArticle,
+  StatuteDetailData,
+  StatuteArticle,
 };

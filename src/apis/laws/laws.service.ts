@@ -10,8 +10,8 @@ import {
   TransformedCleanLawList,
   PageResponse,
   PrecDetailData,
-  LawDetailData,
-  LawArticle,
+  StatuteDetailData,
+  StatuteArticle,
   AIChatCompletionReqMsg,
 } from 'src/common/types';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -39,7 +39,7 @@ export class LawsService {
   async getLawList(
     type: SearchTabEnum,
     queryParams: getLawListDto,
-  ): Promise<PageResponse<LawDetailData[] | PrecDetailData[]>> {
+  ): Promise<PageResponse<StatuteDetailData[] | PrecDetailData[]>> {
     const params: GetLawListParams = { type, ...queryParams };
     const convertedLaws = await this.fetchConvertedLaws(params);
 
@@ -172,22 +172,22 @@ export class LawsService {
   private generateResponseData(
     type: SearchTabEnum,
     lawDetailList: TransformedCleanLawList,
-  ): LawDetailData[] | PrecDetailData[] {
+  ): StatuteDetailData[] | PrecDetailData[] {
     if (type === SearchTabEnum.LAW) {
-      return lawDetailList.map((lawDetail: TransformedCleanDataEntry): LawDetailData => {
-        const lawDetailTyped = lawDetail as unknown as LawDetailData;
-        const lawArticle = this.transformLawArticle(lawDetailTyped.조문.조문단위);
+      return lawDetailList.map((statuteDetail: TransformedCleanDataEntry): StatuteDetailData => {
+        const statuteDetailTyped = statuteDetail as unknown as StatuteDetailData;
+        const lawArticle = this.transformLawArticle(statuteDetailTyped.조문.조문단위);
         return {
           기본정보: {
-            법령ID: Number(lawDetailTyped.기본정보.법령ID),
-            법령명: String(lawDetailTyped.기본정보.법령명_한글),
-            시행일자: Number(lawDetailTyped.기본정보.시행일자),
+            법령ID: Number(statuteDetailTyped.기본정보.법령ID),
+            법령명: String(statuteDetailTyped.기본정보.법령명_한글),
+            시행일자: Number(statuteDetailTyped.기본정보.시행일자),
           },
           조문: {
             조문단위: lawArticle,
           },
           부칙: {
-            부칙단위: lawDetailTyped.부칙.부칙단위,
+            부칙단위: statuteDetailTyped.부칙.부칙단위,
           },
         };
       });
@@ -209,8 +209,10 @@ export class LawsService {
     });
   }
 
-  private transformLawArticle(lawArticleData: LawArticle | LawArticle[]): LawArticle | LawArticle[] {
-    const transformSingleArticle = (article: LawArticle) => {
+  private transformLawArticle(
+    statuteArticleData: StatuteArticle | StatuteArticle[],
+  ): StatuteArticle | StatuteArticle[] {
+    const transformSingleArticle = (article: StatuteArticle) => {
       return {
         조문키: article._attributes.조문키,
         조문번호: article.조문번호,
@@ -223,14 +225,14 @@ export class LawsService {
       };
     };
 
-    if (Array.isArray(lawArticleData)) {
-      return lawArticleData.map(transformSingleArticle);
+    if (Array.isArray(statuteArticleData)) {
+      return statuteArticleData.map(transformSingleArticle);
     } else {
-      return transformSingleArticle(lawArticleData);
+      return transformSingleArticle(statuteArticleData);
     }
   }
 
-  async getLawDetail(type: SearchTabEnum, id: number): Promise<LawDetailData | PrecDetailData> {
+  async getLawDetail(type: SearchTabEnum, id: number): Promise<StatuteDetailData | PrecDetailData> {
     const params = {
       type,
     };
@@ -245,6 +247,20 @@ export class LawsService {
   }
 
   async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<string> {
+    const lawDetail = await this.getLawDetail(type, id);
+
+    const messages = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg);
+
+    const summary = await this.openAiService.createAIChatCompletion(messages);
+    const summaryContent = summary.choices[0].message.content;
+
+    return summaryContent;
+  }
+
+  async generateSummaryReqMessasges(
+    lawDetail: StatuteDetailData | PrecDetailData,
+    recentSummaryMsg: string,
+  ): Promise<AIChatCompletionReqMsg[]> {
     const initContent = this.configService.get('LAW_SUMMARY_INIT_PROMPT');
     const messages: Array<AIChatCompletionReqMsg> = [
       {
@@ -253,14 +269,15 @@ export class LawsService {
       },
     ];
 
-    const lawDetail = await this.getLawDetail(type, id);
     let content: string;
+    let requestType: '판례' | '법령';
     if ('판례내용' in lawDetail) {
       content = lawDetail.판례내용.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n|\r/g, ''); // html 태그, 엔터티, 줄바꿈 제거
+      requestType = '판례';
     } else {
-      content = JSON.stringify(lawDetail);
+      content = JSON.stringify(lawDetail).replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n|\r|"|\[|\{|\}|\]/g, '');
+      requestType = '법령';
     }
-    const requestType = type === 'prec' ? '판례' : '법령';
 
     messages.push({
       role: 'user',
@@ -278,9 +295,6 @@ export class LawsService {
       });
     }
 
-    const summary = await this.openAiService.createAIChatCompletion(messages);
-    const summaryContent = summary.choices[0].message.content;
-
-    return summaryContent;
+    return messages;
   }
 }

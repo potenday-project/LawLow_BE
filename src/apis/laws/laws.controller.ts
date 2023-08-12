@@ -3,7 +3,7 @@ import { LawsService } from './laws.service';
 import { ApiOperation, ApiTags, ApiParam, ApiBody } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
 import { RequestSummaryDto } from './dtos/request-summary.dto';
-import { PageResponse, SearchTabEnum, LawDetailData, PrecDetailData } from 'src/common/types';
+import { PageResponse, SearchTabEnum, StatuteDetailData, PrecDetailData } from 'src/common/types';
 
 @Controller('laws')
 @ApiTags('Laws')
@@ -21,7 +21,7 @@ export class LawsController {
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
     @Query() queryParams: getLawListDto,
-  ): Promise<PageResponse<LawDetailData[] | PrecDetailData[]>> {
+  ): Promise<PageResponse<StatuteDetailData[] | PrecDetailData[]>> {
     return this.lawsService.getLawList(type, queryParams);
   }
 
@@ -41,7 +41,7 @@ export class LawsController {
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
     @Param('id') id: number,
-  ): Promise<LawDetailData | PrecDetailData> {
+  ): Promise<StatuteDetailData | PrecDetailData> {
     return this.lawsService.getLawDetail(type, id);
   }
 

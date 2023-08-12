@@ -21,7 +21,7 @@ export class LawsController {
   @ApiParam({
     name: 'type',
     enum: SearchTabEnum,
-    description: 'prec: 판례, law: 법령',
+    description: 'prec: 판례, statute: 법령',
   })
   getLawList(
     @Param('type', new ParseEnumPipe(SearchTabEnum))
@@ -36,7 +36,7 @@ export class LawsController {
   @ApiParam({
     name: 'type',
     enum: SearchTabEnum,
-    description: 'prec: 판례, law: 법령',
+    description: 'prec: 판례, statute: 법령',
   })
   @ApiParam({
     name: 'id',
@@ -60,7 +60,7 @@ export class LawsController {
   @ApiParam({
     name: 'type',
     enum: SearchTabEnum,
-    description: 'prec: 판례, law: 법령',
+    description: 'prec: 판례, statute: 법령',
   })
   @ApiParam({
     name: 'id',

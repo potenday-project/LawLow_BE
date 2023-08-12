@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { ConfigService } from '@nestjs/config';
 import { AIChatCompletionReqMsg } from 'src/common/types';
@@ -13,14 +13,33 @@ export class OpenaiService {
       apiKey: this.configService.get('OPENAI_API_KEY'),
     }); // singleton
   }
-
-  // TODO: 현재 사용하는 gpt 모델의 maximun context length 제한이 16385 token이라서, 요청 크기가 커지면 에러 발생함.
-  // TODO: 이를 해결하기 위해, token 계산 후 요청을 나눠서 보내는 방법 등을 고려해볼 필요 있음.
   async createAIChatCompletion(
     messages: Array<AIChatCompletionReqMsg>,
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
-    const tokens = this.calculateTokensWithTiktoken(messages);
-    if (tokens > 16385) throw new BadRequestException('요청한 메시지의 길이가 너무 깁니다. 메시지를 줄여주세요.');
+    const MAX_TOKENS = 16385;
+    const REDUCE_TOKENS_RATIO = 0.9;
+    let currentTokens = this.calculateTokensWithTiktoken(messages);
+    // 토큰 수가 16385개를 초과하는 경우 마지막 메시지의 content를 줄임
+    while (currentTokens > MAX_TOKENS && messages.length > 0) {
+      const longestContentMessage = messages.reduce((prev, current) => {
+        return prev.content.length > current.content.length ? prev : current;
+      });
+      // content의 길이를 10% 줄여봄. (이 비율은 조정 가능)
+      longestContentMessage.content = longestContentMessage.content.substring(
+        0,
+        Math.floor(longestContentMessage.content.length * REDUCE_TOKENS_RATIO),
+      );
+      console.log('messages: ', messages);
+
+      currentTokens = this.calculateTokensWithTiktoken(messages); // 다시 토큰 수 계산
+    }
+
+    console.log('currentTokens: ', currentTokens);
+    if (currentTokens > MAX_TOKENS) {
+      throw new InternalServerErrorException(
+        '최대 토큰 수를 초과하여 줄이는 작업을 수행했음에도 불구하고, 토큰 수가 16385개를 초과합니다. 더 짧은 메시지를 입력해주세요.',
+      );
+    }
 
     const requestData: OpenAI.Chat.Completions.CompletionCreateParamsNonStreaming = {
       model: 'gpt-3.5-turbo-16k',

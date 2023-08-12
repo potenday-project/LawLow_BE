@@ -77,7 +77,7 @@ export class LawsService {
     return {
       params: {
         OC: this.configService.get('LAW_OPEN_API_OC'),
-        target: type,
+        target: type === 'prec' ? 'prec' : 'law',
         search: SearchRangeEnum.CONTENT,
         query: q,
         sort,
@@ -173,7 +173,7 @@ export class LawsService {
     type: SearchTabEnum,
     lawDetailList: TransformedCleanLawList,
   ): StatuteDetailData[] | PrecDetailData[] {
-    if (type === SearchTabEnum.LAW) {
+    if (type === SearchTabEnum.STATUTE) {
       return lawDetailList.map((statuteDetail: TransformedCleanDataEntry): StatuteDetailData => {
         const statuteDetailTyped = statuteDetail as unknown as StatuteDetailData;
         const lawArticle = this.transformLawArticle(statuteDetailTyped.조문.조문단위);
@@ -249,6 +249,7 @@ export class LawsService {
   async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
     const lawDetail = await this.getLawDetail(type, id);
 
+    // 법령 같은 경우 현재 요약 불가(token 길이 초과) -> 내용 잘라서 일부만 쉬운 제목과 키워드로 반환
     const onlySummaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
       onlySummary: true,
     });
@@ -262,7 +263,10 @@ export class LawsService {
     }
 
     const MAX_RETRY_COUNT = 3;
-    const { easyTitle, keywords } = await this.fetchTitleAndKeywords(onlySummaryContent, MAX_RETRY_COUNT);
+    // 판례는 요약된 내용 기반으로 쉬운 제목과 키워드 생성, 법령은 법령 전체 내용 기반으로 쉬운 제목과 키워드 생성
+    const detailsForTitleAndKeywords: string | StatuteDetailData =
+      type === 'prec' ? onlySummaryContent : (lawDetail as StatuteDetailData);
+    const { easyTitle, keywords } = await this.fetchTitleAndKeywords(detailsForTitleAndKeywords, MAX_RETRY_COUNT);
 
     return {
       easyTitle,
@@ -272,7 +276,7 @@ export class LawsService {
   }
 
   async fetchTitleAndKeywords(
-    summaryContent: string,
+    summaryContent: StatuteDetailData | string,
     retryCount = 3,
   ): Promise<{ easyTitle: string; keywords: string[] }> {
     for (let i = 0; i < retryCount; i++) {
@@ -294,6 +298,13 @@ export class LawsService {
     throw new InternalServerErrorException('요약 제목과 키워드를 생성하지 못했습니다.');
   }
 
+  /**
+   *
+   * @param lawDetail 요약할 법령/판례 데이터
+   * @param recentSummaryMsg 직전 요약 메시지(더 쉽게 해석 기능을 위함) -> 있으면 제목/키워드 없이 요약만 생성
+   * @param onlySummary 요약만 할지, 요약과 쉬운 제목/키워드를 생성할지 여부
+   * @returns 요약 메시지 생성을 위한 요청 메시지 배열
+   */
   async generateSummaryReqMessasges(
     lawDetail: StatuteDetailData | PrecDetailData | string,
     recentSummaryMsg?: string,

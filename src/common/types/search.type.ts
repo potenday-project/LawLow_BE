@@ -1,7 +1,7 @@
 // Client Request
 export enum SearchTabEnum {
   PRECEDENT = 'prec',
-  LAW = 'law',
+  STATUTE = 'statute',
 }
 export enum SearchRangeEnum {
   TITLE = 1,

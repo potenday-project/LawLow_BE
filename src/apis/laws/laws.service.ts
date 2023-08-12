@@ -15,7 +15,7 @@ import {
   AIChatCompletionReqMsg,
   LawSummaryResponseData,
 } from 'src/common/types';
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
@@ -247,40 +247,59 @@ export class LawsService {
   }
 
   async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
+    const MAX_RETRY_KEYWORD_TITLE_COUNT = 2;
     const lawDetail = await this.getLawDetail(type, id);
 
-    // 법령 같은 경우 현재 요약 불가(token 길이 초과) -> 내용 잘라서 일부만 쉬운 제목과 키워드로 반환
     const onlySummaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
       onlySummary: true,
     });
-    const onlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
-    const onlySummaryContent = onlySummaryResponse.choices[0].message.content;
 
     const isFirstSummary = !recentSummaryMsg;
-    // 첫번째 요약이 아닌 경우 요약 내용만 반환
     if (!isFirstSummary) {
-      return { summary: onlySummaryContent };
+      const onlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
+      return { summary: onlySummaryResponse.choices[0].message.content };
     }
 
-    const MAX_RETRY_COUNT = 3;
-    // 판례는 요약된 내용 기반으로 쉬운 제목과 키워드 생성, 법령은 법령 전체 내용 기반으로 쉬운 제목과 키워드 생성
-    const detailsForTitleAndKeywords: string | StatuteDetailData =
-      type === 'prec' ? onlySummaryContent : (lawDetail as StatuteDetailData);
-    const { easyTitle, keywords } = await this.fetchTitleAndKeywords(detailsForTitleAndKeywords, MAX_RETRY_COUNT);
+    // 판례는 요약받은 내용으로 제목과 키워드를 추출하고, 법령은 본문으로 제목과 키워드를 추출
+    switch (type) {
+      case 'prec':
+        const precOnlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
+        const detailsForTitleAndKeywords = precOnlySummaryResponse.choices[0].message.content.replace(/\n/g, '');
+        const { easyTitle: precEasyTitle, keywords: precKeywords } = await this.fetchTitleAndKeywords(
+          detailsForTitleAndKeywords,
+          MAX_RETRY_KEYWORD_TITLE_COUNT,
+        );
 
-    return {
-      easyTitle,
-      summary: onlySummaryContent,
-      keywords,
-    };
+        return {
+          easyTitle: precEasyTitle,
+          summary: detailsForTitleAndKeywords,
+          keywords: precKeywords,
+        };
+
+      case 'statute':
+        const [onlySummaryResponse, { easyTitle: statuteEasyTitle, keywords: statuteKeywords }] = await Promise.all([
+          this.openAiService.createAIChatCompletion(onlySummaryReqMsgs),
+          this.fetchTitleAndKeywords(lawDetail as StatuteDetailData, MAX_RETRY_KEYWORD_TITLE_COUNT),
+        ]);
+
+        return {
+          easyTitle: statuteEasyTitle,
+          summary: onlySummaryResponse.choices[0].message.content,
+          keywords: statuteKeywords,
+        };
+
+      default:
+        throw new BadRequestException('잘못된 타입입니다.');
+    }
   }
 
   async fetchTitleAndKeywords(
     summaryContent: StatuteDetailData | string,
-    retryCount = 3,
+    retryCount = 2,
   ): Promise<{ easyTitle: string; keywords: string[] }> {
+    const titleKeywordReqMessages = await this.generateSummaryReqMessasges(summaryContent);
+
     for (let i = 0; i < retryCount; i++) {
-      const titleKeywordReqMessages = await this.generateSummaryReqMessasges(summaryContent);
       const titleKeywordResponse = await this.openAiService.createAIChatCompletion(titleKeywordReqMessages);
       const titleKeywordContent = titleKeywordResponse.choices[0].message.content;
 
@@ -353,7 +372,7 @@ export class LawsService {
       content: `${requestType}${
         onlySummary || !isFirstSummary
           ? '내용 누구나 이해하기 쉬운 수준으로 요약해서 설명 부탁해.'
-          : '의 제목과 키워드를 알려줘.'
+          : '의 이해하기 쉬운 제목과 키워드를 알려줘.'
       } ${content}`,
     });
 

@@ -261,25 +261,22 @@ export class LawsService {
       return { summary: onlySummaryContent };
     }
 
-    try {
-      const MAX_RETRY_COUNT = 3;
-      const { easyTitle, keywords } = await this.fetchTitleAndKeywords(lawDetail, MAX_RETRY_COUNT);
-      return {
-        easyTitle,
-        summary: onlySummaryContent,
-        keywords,
-      };
-    } catch (error) {
-      throw error;
-    }
+    const MAX_RETRY_COUNT = 3;
+    const { easyTitle, keywords } = await this.fetchTitleAndKeywords(onlySummaryContent, MAX_RETRY_COUNT);
+
+    return {
+      easyTitle,
+      summary: onlySummaryContent,
+      keywords,
+    };
   }
 
   async fetchTitleAndKeywords(
-    lawDetail: StatuteDetailData | PrecDetailData,
+    summaryContent: string,
     retryCount = 3,
   ): Promise<{ easyTitle: string; keywords: string[] }> {
     for (let i = 0; i < retryCount; i++) {
-      const titleKeywordReqMessages = await this.generateSummaryReqMessasges(lawDetail);
+      const titleKeywordReqMessages = await this.generateSummaryReqMessasges(summaryContent);
       const titleKeywordResponse = await this.openAiService.createAIChatCompletion(titleKeywordReqMessages);
       const titleKeywordContent = titleKeywordResponse.choices[0].message.content;
 
@@ -298,7 +295,7 @@ export class LawsService {
   }
 
   async generateSummaryReqMessasges(
-    lawDetail: StatuteDetailData | PrecDetailData,
+    lawDetail: StatuteDetailData | PrecDetailData | string,
     recentSummaryMsg?: string,
     { onlySummary }: { onlySummary?: boolean } = {
       onlySummary: false,
@@ -321,13 +318,18 @@ export class LawsService {
       },
       {
         role: 'assistant',
-        content: `판례/법령 내용을 주세요.${isFirstSummary ? ' 무조건 제목:, 키워드: 형식으로 알려드립니다.' : ''}`, // 요금 절약을 위해 제목, 키워드 결과를 같이 받아옴
+        content: `판례/법령 내용을 주세요.${
+          onlySummary || !isFirstSummary ? '' : ' 무조건 제목:, 키워드: 형식으로 알려드립니다.'
+        }`, // 요금 절약을 위해 제목, 키워드 결과를 같이 받아옴
       },
     ];
 
     let content: string;
     let requestType: '판례' | '법령';
-    if ('판례내용' in lawDetail) {
+    if (typeof lawDetail === 'string') {
+      content = lawDetail;
+      requestType = '판례';
+    } else if ('판례내용' in lawDetail) {
       content = lawDetail.판례내용.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n|\r/g, ''); // html 태그, 엔터티, 줄바꿈 제거
       requestType = '판례';
     } else {
@@ -337,7 +339,11 @@ export class LawsService {
 
     messages.push({
       role: 'user',
-      content: `${requestType} 내용 누구나 이해하기 쉬운 수준으로 요약해서 설명 부탁해. ${content}`,
+      content: `${requestType}${
+        onlySummary || !isFirstSummary
+          ? '내용 누구나 이해하기 쉬운 수준으로 요약해서 설명 부탁해.'
+          : '의 제목과 키워드를 알려줘.'
+      } ${content}`,
     });
 
     if (!isFirstSummary) {

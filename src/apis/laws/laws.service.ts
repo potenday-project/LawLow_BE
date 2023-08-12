@@ -13,6 +13,7 @@ import {
   StatuteDetailData,
   StatuteArticle,
   AIChatCompletionReqMsg,
+  LawSummaryResponseData,
 } from 'src/common/types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -20,7 +21,6 @@ import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
 import { getLawListDto } from './dtos/get-law.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
-
 interface GetLawListParams {
   type: SearchTabEnum;
   q: string;
@@ -246,26 +246,51 @@ export class LawsService {
     return responseData[0];
   }
 
-  async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<string> {
+  async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
     const lawDetail = await this.getLawDetail(type, id);
 
-    const messages = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg);
+    const summaryReqMessages = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg);
+    const summaryResponse = await this.openAiService.createAIChatCompletion(summaryReqMessages);
+    const summaryContent = summaryResponse.choices[0].message.content;
 
-    const summary = await this.openAiService.createAIChatCompletion(messages);
-    const summaryContent = summary.choices[0].message.content;
+    const isFirstSummary = !recentSummaryMsg;
+    // 첫번째 요약이 아닌 경우 요약 내용만 반환
+    if (!isFirstSummary) {
+      return { summary: summaryContent };
+    }
 
-    return summaryContent;
+    const title = summaryContent.split('요약:')[0].replace('제목:', '').trim();
+    const summary = summaryContent.split('요약:')[1].split('키워드:')[0].trim();
+    const keywordsString = summaryContent.split('키워드:')[1].trim();
+    const keywords = keywordsString?.split(',').map((keyword) => keyword.trim());
+
+    return {
+      easyTitle: title,
+      summary: summary,
+      keywords: keywords,
+    };
   }
 
   async generateSummaryReqMessasges(
     lawDetail: StatuteDetailData | PrecDetailData,
     recentSummaryMsg: string,
   ): Promise<AIChatCompletionReqMsg[]> {
-    const initContent = this.configService.get('LAW_SUMMARY_INIT_PROMPT');
+    const isFirstSummary = !recentSummaryMsg;
+    const initContent = isFirstSummary
+      ? this.configService.get('LAW_SUMMARY_INIT_PROMPT')
+      : this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY');
     const messages: Array<AIChatCompletionReqMsg> = [
       {
         role: 'system',
         content: initContent,
+      },
+      {
+        role: 'user',
+        content: initContent,
+      },
+      {
+        role: 'assistant',
+        content: `판례/법령 내용을 주세요.${isFirstSummary ? ' 제목:, 요약:, 키워드: 형식으로 알려드립니다.' : ''}`, // 요금 절약을 위해 한 번의 요청으로 제목, 요약, 키워드를 모두 받아옴
       },
     ];
 

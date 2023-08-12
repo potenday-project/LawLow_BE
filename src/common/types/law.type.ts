@@ -100,6 +100,12 @@ interface PrecDetailData {
 
 type TransformedCleanLawList = (TransformedCleanDataEntry | TransformedCleanDataEntry[])[];
 
+interface LawSummaryResponseData {
+  easyTitle?: string;
+  summary: string;
+  keywords?: string[];
+}
+
 export {
   LawListApiResponse,
   RawLawData,
@@ -110,4 +116,5 @@ export {
   TransformedCleanLawList,
   StatuteDetailData,
   StatuteArticle,
+  LawSummaryResponseData,
 };

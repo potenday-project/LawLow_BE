@@ -35,5 +35,5 @@ lerna-debug.log*
 !.vscode/extensions.json
 
 # environment
-.env.*
+.env*
 connect.sh

@@ -9,7 +9,6 @@ export enum SearchRangeEnum {
 }
 export interface SearchRequest {
   q: string;
-  // type: SearchTabEnum;
   page: number;
   take: number;
 }

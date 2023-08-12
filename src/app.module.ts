@@ -10,6 +10,7 @@ import { NestModule } from '@nestjs/common';
 import { MiddlewareConsumer } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
 import { SharedModule } from './shared/shared.module';
+import { PrismaModule } from './common/prisma/prisma.module';
 
 @Module({
   imports: [
@@ -17,8 +18,9 @@ import { SharedModule } from './shared/shared.module';
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV}`,
     }),
-    LawModule,
+    PrismaModule,
     SharedModule,
+    LawModule,
     HealthCheckerModule,
   ],
   providers: [

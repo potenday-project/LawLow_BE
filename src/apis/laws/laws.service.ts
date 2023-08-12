@@ -293,7 +293,7 @@ export class LawsService {
     }
   }
 
-  async fetchTitleAndKeywords(
+  private async fetchTitleAndKeywords(
     summaryContent: StatuteDetailData | string,
     retryCount = 2,
   ): Promise<{ easyTitle: string; keywords: string[] }> {
@@ -319,12 +319,13 @@ export class LawsService {
 
   /**
    *
+   * 판례 요약을 위한 요청 메시지를 생성하는 메서드
    * @param lawDetail 요약할 법령/판례 데이터
    * @param recentSummaryMsg 직전 요약 메시지(더 쉽게 해석 기능을 위함) -> 있으면 제목/키워드 없이 요약만 생성
    * @param onlySummary 요약만 할지, 요약과 쉬운 제목/키워드를 생성할지 여부
    * @returns 요약 메시지 생성을 위한 요청 메시지 배열
    */
-  async generateSummaryReqMessasges(
+  private async generateSummaryReqMessasges(
     lawDetail: StatuteDetailData | PrecDetailData | string,
     recentSummaryMsg?: string,
     { onlySummary }: { onlySummary?: boolean } = {

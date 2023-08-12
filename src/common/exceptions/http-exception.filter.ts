@@ -65,7 +65,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (resObject.statusCode >= 500) {
       this.logger.error(log, stack);
     } else {
-      this.logger.debug(log, stack);
+      this.logger.warn(log);
     }
   }
 }

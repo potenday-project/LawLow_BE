@@ -37,8 +37,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const resObject: CommonResponse = {
       success: false,
       statusCode,
-      message: typeof err === 'string' ? err : err.message ?? exception.message ?? null,
-      detail: this.getDetail(exception, err, req),
+      errorMessage: typeof err === 'string' ? err : err.message ?? exception.message ?? null,
+      errorDetail: this.getDetail(exception, err, req),
     };
 
     this.logErrorOrWarning(stack, resObject, req);

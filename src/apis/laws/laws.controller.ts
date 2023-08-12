@@ -91,7 +91,7 @@ export class LawsController {
       },
     },
     required: false,
-    description: 'assistantMessages: 직전에 제공받은 요약문을 입력합니다.',
+    description: 'recentSummaryMsg: 직전에 제공받은 요약문을 입력합니다.',
   })
   @ApiResponse({
     status: 201,

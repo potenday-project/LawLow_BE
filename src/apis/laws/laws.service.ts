@@ -15,7 +15,7 @@ import {
   AIChatCompletionReqMsg,
   LawSummaryResponseData,
 } from 'src/common/types';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
@@ -249,34 +249,65 @@ export class LawsService {
   async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
     const lawDetail = await this.getLawDetail(type, id);
 
-    const summaryReqMessages = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg);
-    const summaryResponse = await this.openAiService.createAIChatCompletion(summaryReqMessages);
-    const summaryContent = summaryResponse.choices[0].message.content;
+    const onlySummaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
+      onlySummary: true,
+    });
+    const onlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
+    const onlySummaryContent = onlySummaryResponse.choices[0].message.content;
 
     const isFirstSummary = !recentSummaryMsg;
     // 첫번째 요약이 아닌 경우 요약 내용만 반환
     if (!isFirstSummary) {
-      return { summary: summaryContent };
+      return { summary: onlySummaryContent };
     }
 
-    const title = summaryContent.split('요약:')[0].replace('제목:', '').trim();
-    const summary = summaryContent.split('요약:')[1].split('키워드:')[0].trim();
-    const keywordsString = summaryContent.split('키워드:')[1].trim();
-    const keywords = keywordsString?.split(',').map((keyword) => keyword.trim());
+    try {
+      const MAX_RETRY_COUNT = 3;
+      const { easyTitle, keywords } = await this.fetchTitleAndKeywords(lawDetail, MAX_RETRY_COUNT);
+      return {
+        easyTitle,
+        summary: onlySummaryContent,
+        keywords,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 
-    return {
-      easyTitle: title,
-      summary: summary,
-      keywords: keywords,
-    };
+  async fetchTitleAndKeywords(
+    lawDetail: StatuteDetailData | PrecDetailData,
+    retryCount = 3,
+  ): Promise<{ easyTitle: string; keywords: string[] }> {
+    for (let i = 0; i < retryCount; i++) {
+      const titleKeywordReqMessages = await this.generateSummaryReqMessasges(lawDetail);
+      const titleKeywordResponse = await this.openAiService.createAIChatCompletion(titleKeywordReqMessages);
+      const titleKeywordContent = titleKeywordResponse.choices[0].message.content;
+
+      const title = titleKeywordContent.split('제목:')[1]?.split('키워드:')[0].trim();
+      const keywordsString = titleKeywordContent.split('키워드:')[1]?.trim();
+      const keywords = keywordsString?.split(',').map((keyword) => keyword.trim());
+
+      if (title && keywords) {
+        return {
+          easyTitle: title,
+          keywords: keywords,
+        };
+      }
+    }
+    throw new InternalServerErrorException('요약 제목과 키워드를 생성하지 못했습니다.');
   }
 
   async generateSummaryReqMessasges(
     lawDetail: StatuteDetailData | PrecDetailData,
-    recentSummaryMsg: string,
+    recentSummaryMsg?: string,
+    { onlySummary }: { onlySummary?: boolean } = {
+      onlySummary: false,
+    },
   ): Promise<AIChatCompletionReqMsg[]> {
     const isFirstSummary = !recentSummaryMsg;
-    const initContent = isFirstSummary
+    const initContent = onlySummary
+      ? this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY')
+      : isFirstSummary
       ? this.configService.get('LAW_SUMMARY_INIT_PROMPT')
       : this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY');
     const messages: Array<AIChatCompletionReqMsg> = [
@@ -290,7 +321,7 @@ export class LawsService {
       },
       {
         role: 'assistant',
-        content: `판례/법령 내용을 주세요.${isFirstSummary ? ' 제목:, 요약:, 키워드: 형식으로 알려드립니다.' : ''}`, // 요금 절약을 위해 한 번의 요청으로 제목, 요약, 키워드를 모두 받아옴
+        content: `판례/법령 내용을 주세요.${isFirstSummary ? ' 무조건 제목:, 키워드: 형식으로 알려드립니다.' : ''}`, // 요금 절약을 위해 제목, 키워드 결과를 같이 받아옴
       },
     ];
 
@@ -306,10 +337,10 @@ export class LawsService {
 
     messages.push({
       role: 'user',
-      content: `${requestType} 내용 중학생도 이해하기 쉽게 요약 설명 부탁해. ${content}`,
+      content: `${requestType} 내용 누구나 이해하기 쉬운 수준으로 요약해서 설명 부탁해. ${content}`,
     });
 
-    if (recentSummaryMsg) {
+    if (!isFirstSummary) {
       messages.push({
         role: 'assistant',
         content: recentSummaryMsg.replace(/<[^>]*>|&nbsp;|&gt;|&amp;?|\n/g, ''),

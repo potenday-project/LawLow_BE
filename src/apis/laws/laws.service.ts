@@ -12,6 +12,7 @@ import {
   PrecDetailData,
   LawDetailData,
   LawArticle,
+  AIChatCompletionReqMsg,
 } from 'src/common/types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -245,7 +246,7 @@ export class LawsService {
 
   async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<string> {
     const initContent = this.configService.get('LAW_SUMMARY_INIT_PROMPT');
-    const messages = [
+    const messages: Array<AIChatCompletionReqMsg> = [
       {
         role: 'system',
         content: initContent,

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { ConfigService } from '@nestjs/config';
 import { AIChatCompletionReqMsg } from 'src/common/types';
@@ -13,18 +13,20 @@ export class OpenaiService {
       apiKey: this.configService.get('OPENAI_API_KEY'),
     }); // singleton
   }
+
   async createAIChatCompletion(
     messages: Array<AIChatCompletionReqMsg>,
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
     const MAX_TOKENS = 16385;
+    const SUB_MAX_TOKENS = 4097;
     const REDUCE_TOKENS_RATIO = 0.5;
     let currentTokens = this.calculateTokensWithTiktoken(messages);
-    // 토큰 수가 16385개를 초과하는 경우 마지막 메시지의 content를 줄임
+    // 토큰 수가 16385개를 초과하는 경우 가장 긴 메시지의 content를 줄임
     while (currentTokens > MAX_TOKENS && messages.length > 0) {
       const longestContentMessage = messages.reduce((prev, current) => {
         return prev.content.length > current.content.length ? prev : current;
       });
-      // content의 길이를 50% 줄여봄. (요금때문에 30%로 함)
+      // content의 길이를 50% 줄여봄. (요금때문에 50% 단위로 줄여봄)
       longestContentMessage.content = longestContentMessage.content.substring(
         0,
         Math.floor(longestContentMessage.content.length * REDUCE_TOKENS_RATIO),
@@ -34,13 +36,14 @@ export class OpenaiService {
     }
 
     if (currentTokens > MAX_TOKENS) {
-      throw new InternalServerErrorException(
-        '최대 토큰 수를 초과하여 줄이는 작업을 수행했음에도 불구하고, 토큰 수가 16385개를 초과합니다. 더 짧은 메시지를 입력해주세요.',
+      throw new BadRequestException(
+        '최대 토큰 수를 초과하여 줄이는 작업을 수행했음에도 불구하고, 토큰 수가 기준을 초과합니다. 더 짧은 메시지를 입력해주세요.',
       );
     }
 
+    const gptModel = currentTokens > SUB_MAX_TOKENS ? 'gpt-3.5-turbo-16k' : 'gpt-3.5-turbo';
     const requestData: OpenAI.Chat.Completions.CompletionCreateParamsNonStreaming = {
-      model: 'gpt-3.5-turbo-16k',
+      model: gptModel,
       messages,
     };
 

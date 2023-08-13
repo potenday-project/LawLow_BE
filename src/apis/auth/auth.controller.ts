@@ -14,6 +14,9 @@ export class AuthController {
   @Post('/login/:login_type')
   @ApiOperation({
     summary: '소셜 로그인 API',
+    description: `로그인 완료 시 AT(accessToken), RT(refreshToken)를 발급합니다. AT는 30분, RT는 7일간 유효합니다. 
+    AT는 응답 body에 담겨서 전달되며, RT는 httpOnly secure 쿠키에 담겨서 전달됩니다.
+    AT 만료 시 RT를 활용하여 AT를 refresh할 수 있습니다.`,
   })
   @ApiParam({
     name: 'login_type',
@@ -51,7 +54,7 @@ export class AuthController {
   @Post('/silent-refresh')
   @ApiOperation({
     summary: '토큰 리프레시 API',
-    description: 'refreshToken을 활용하여 accessToken과 refreshToken을 refresh합니다.',
+    description: 'AT 만료 시 RT 활용하여 AT과 RT을 refresh합니다.',
   })
   async refreshToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const userRefreshToken = req.cookies['refreshToken'];

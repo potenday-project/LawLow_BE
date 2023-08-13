@@ -7,6 +7,12 @@ import { CreateUserInfo } from '../../common/types';
 export class UsersService {
   constructor(private readonly prismaService: PrismaService) {}
 
+  async findOneByOAuthId(oauthId: string, loginType: Provider): Promise<User> {
+    return await this.prismaService.user.findFirst({
+      where: { oauthIds: { some: { provider: loginType, id: oauthId } } },
+    });
+  }
+
   async findOneById(id: number): Promise<User> {
     return await this.prismaService.user.findUnique({ where: { id } });
   }
@@ -16,18 +22,17 @@ export class UsersService {
   }
 
   async create(user: CreateUserInfo, provider: Provider): Promise<User> {
-    const isExist = await this.findOneByEmail(user.email);
-    console.log('isExist: ', isExist, typeof isExist);
-    if (isExist) {
-      throw new BadRequestException('이미 존재하는 이메일의 유저입니다.');
+    // validation
+    const isExistEmail = await this.findOneByEmail(user.email);
+    if (isExistEmail) {
+      throw new BadRequestException('이미 존재하는 이메일입니다.');
     }
-    const isExistOAuthId = await this.prismaService.oauthid.findUnique({
-      where: { id: user.social_id },
-    });
+    const isExistOAuthId = await this.findOneByOAuthId(user.social_id, provider);
     if (isExistOAuthId) {
       throw new BadRequestException('이미 존재하는 소설 계정입니다.');
     }
 
+    // create user
     const newUserResult = await this.prismaService.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {

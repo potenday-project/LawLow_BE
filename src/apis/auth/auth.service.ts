@@ -18,9 +18,10 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async oAuthLogin(login_type: Provider, token: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async oAuthLogin(loginType: Provider, token: string): Promise<{ accessToken: string; refreshToken: string }> {
+    // OAuth 토큰 검증
     let oAuthUser: CreateUserInfo;
-    switch (login_type) {
+    switch (loginType) {
       case Provider.google:
         oAuthUser = await this.loginWithGoogle(token);
         break;
@@ -29,11 +30,11 @@ export class AuthService {
         throw new BadRequestException('잘못된 로그인 타입입니다.');
     }
 
-    let user: User = await this.usersService.findOneByEmail(oAuthUser.email);
+    let user: User = await this.usersService.findOneByOAuthId(oAuthUser.social_id, loginType);
 
     // 자동 회원가입
     if (!user) {
-      user = await this.usersService.create(oAuthUser, login_type);
+      user = await this.usersService.create(oAuthUser, loginType);
     }
 
     // 토큰 발급
@@ -87,6 +88,7 @@ export class AuthService {
     let account: CreateUserInfo;
     const clientId: string = this.configService.get('GOOGLE_CLIENT_ID_PROD');
     const client: OAuth2Client = new OAuth2Client(clientId);
+
     try {
       const ticket: LoginTicket = await client.verifyIdToken({
         idToken: token,
@@ -108,7 +110,7 @@ export class AuthService {
     return account;
   }
 
-  private getUserPayloadInfo(user: User): UserPayloadInfo {
+  getUserPayloadInfo(user: User): UserPayloadInfo {
     return {
       userId: user.id,
       email: user.email,

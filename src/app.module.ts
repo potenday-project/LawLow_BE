@@ -13,12 +13,18 @@ import { SharedModule } from './shared/shared.module';
 import { AuthModule } from './apis/auth/auth.module';
 import { UsersModule } from './apis/users/users.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV}`,
+    }),
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 30,
     }),
     PrismaModule,
     SharedModule,
@@ -35,6 +41,10 @@ import { PrismaModule } from './common/prisma/prisma.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: SuccessInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

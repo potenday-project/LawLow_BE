@@ -1,6 +1,6 @@
 import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body, ParseIntPipe } from '@nestjs/common';
 import { LawsService } from './laws.service';
-import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
 import { RequestSummaryDto } from './dtos/request-summary.dto';
 import {
@@ -10,6 +10,7 @@ import {
   PrecDetailData,
   LawSummaryResponseData,
 } from 'src/common/types';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('laws')
 @ApiTags('Laws')
@@ -57,6 +58,7 @@ export class LawsController {
     description:
       "'더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다. \n\n '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.",
   })
+  @Throttle(4, 60)
   @ApiParam({
     name: 'type',
     enum: SearchTabEnum,
@@ -149,10 +151,37 @@ export class LawsController {
       },
     },
   })
+  @ApiTooManyRequestsResponse({
+    description: '요청 횟수 제한 초과 (1분에 4번)',
+    content: {
+      'application/json': {
+        schema: {
+          properties: {
+            success: {
+              type: 'boolean',
+              example: false,
+            },
+            statusCode: {
+              type: 'number',
+              example: 429,
+            },
+            message: {
+              type: 'string',
+              example: 'Too Many Requests',
+            },
+            erorrDetail: {
+              type: 'string',
+              example: 'Too many Requests at [" /laws/statute/1/summary "]',
+            },
+          },
+        },
+      },
+    },
+  })
   createLawSummary(
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
-    @Param('id') id: number,
+    @Param('id', new ParseIntPipe()) id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
   ): Promise<LawSummaryResponseData> {
     return this.lawsService.createLawSummary(type, id, requestSummaryDto.recentSummaryMsg);

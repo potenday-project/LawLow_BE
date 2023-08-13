@@ -1,6 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { UserPayloadInfo, CreateUserInfo } from 'src/common/types';
+import { JwtPayloadInfo, CreateUserInfo } from 'src/common/types';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Provider, User } from '@prisma/client';
@@ -39,45 +39,13 @@ export class AuthService {
 
     // 토큰 발급
     const userPayloadInfo = this.getUserPayloadInfo(user);
-    const { accessToken, refreshToken } = await this.getTokens(userPayloadInfo);
+    const { accessToken, refreshToken } = await this.generateTokens(userPayloadInfo);
 
     return { accessToken, refreshToken };
   }
 
-  async refreshToken(res: Response, userRefreshToken: string) {
-    let userId: number;
-
-    if (!userRefreshToken) {
-      throw new UnauthorizedException('Refresh Token이 없습니다.');
-    }
-
-    try {
-      const payload = await this.verifyToken(userRefreshToken, {
-        isRefreshToken: true,
-      });
-      userId = payload.userId;
-    } catch (err) {
-      res.cookie('refreshToken', '', {
-        maxAge: 0,
-      });
-      throw new UnauthorizedException(err.message);
-    }
-
-    const user = await this.usersService.findOneById(userId);
-    if (!user) {
-      throw new UnauthorizedException('존재하지 않는 유저입니다.');
-    }
-
-    const { accessToken, refreshToken } = await this.getTokens(this.getUserPayloadInfo(user));
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  }
-
   verifyToken(token: string, { isRefreshToken }: { isRefreshToken: boolean } = { isRefreshToken: false }) {
-    const payload: UserPayloadInfo | { userId: number } = this.jwtService.verify(token, {
+    const payload: JwtPayloadInfo = this.jwtService.verify(token, {
       secret: this.configService.get(`${isRefreshToken ? 'REFRESH' : 'ACCESS'}_SECRET_KEY`),
     });
 
@@ -110,28 +78,22 @@ export class AuthService {
     return account;
   }
 
-  getUserPayloadInfo(user: User): UserPayloadInfo {
+  getUserPayloadInfo(user: User): JwtPayloadInfo {
     return {
       userId: user.id,
-      email: user.email,
-      name: user.name,
-      profileImage: user.profileImage,
     };
   }
 
-  private async getTokens(user: UserPayloadInfo): Promise<{ accessToken: string; refreshToken: string }> {
+  async generateTokens(user: JwtPayloadInfo): Promise<{ accessToken: string; refreshToken: string }> {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(user, {
         secret: this.configService.get('ACCESS_SECRET_KEY'),
         expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
       }),
-      this.jwtService.signAsync(
-        { userId: user.userId },
-        {
-          secret: this.configService.get('REFRESH_SECRET_KEY'),
-          expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
-        },
-      ),
+      this.jwtService.signAsync(user, {
+        secret: this.configService.get('REFRESH_SECRET_KEY'),
+        expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
+      }),
     ]);
 
     return {

@@ -1,13 +1,8 @@
 import { Request } from 'express';
 
-export interface UserPayloadInfo {
+export interface JwtPayloadInfo {
   userId: number;
-  name: string;
-  email: string;
-  profileImage: string;
 }
-
-export type RefreshToktenPayloadInfo = Pick<UserPayloadInfo, 'userId'>;
 
 export interface CreateUserInfo {
   social_id: string;
@@ -17,7 +12,7 @@ export interface CreateUserInfo {
 }
 
 export interface RequestWithUser extends Request {
-  user: UserPayloadInfo;
+  user: JwtPayloadInfo;
 }
 
 export enum AuthGuardType {

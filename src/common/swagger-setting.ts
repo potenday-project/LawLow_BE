@@ -10,7 +10,7 @@ const swaggerCustomOptions: SwaggerCustomOptions = {
 export const setupSwagger = (app: INestApplication): void => {
   const config = new DocumentBuilder()
     .setTitle('LawLow(로우로우) API Docs')
-    .setDescription('LawLow(로우로우) API 명세서에 오신 걸 환영합니다 ^~^ \n\n 궁금한 점은 언제든지 물어봐 주세용!')
+    .setDescription('LawLow(로우로우) API 명세서에 오신 걸 환영합니다 ^~^ \n\n 궁금한 점은 언제든지 물어봐 주세요~!')
     .setVersion('0.0.1')
     .addBearerAuth(
       {
@@ -19,7 +19,7 @@ export const setupSwagger = (app: INestApplication): void => {
         name: 'JWT',
         in: 'header',
       },
-      'accessToken',
+      'access-token',
     )
     .build();
 

@@ -2,11 +2,11 @@ import { Controller, Param, ParseEnumPipe, Body, Res, Req, Post, UseGuards } fro
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { Provider } from '@prisma/client';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { LoginDto } from './dtos/login.dto';
-import { AuthGuard } from './security/guards/access-token.guard';
-import { SetAuthGuardType } from 'src/common/decorators/auth-guard-type.decorator';
-import { AuthGuardType } from 'src/common/types';
+import { AuthGuard } from '@nestjs/passport';
+import { JwtUserPayload } from 'src/common/decorators/jwt-user.decorator';
+import { JwtPayloadInfo } from 'src/common/types';
 
 @Controller('auth')
 @ApiTags('Auth')
@@ -55,17 +55,15 @@ export class AuthController {
   }
 
   @Post('/silent-refresh')
-  @SetAuthGuardType(AuthGuardType.REFRESH)
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard('jwt-refresh'))
   @ApiOperation({
     summary: '토큰 리프레시 API',
     description: `
-    AT 만료 시 쿠키에 담겨오는 RT를 활용하여 AT를 refresh합니다.(보안을 위해 RT도 함께 refresh 됩니다.)`,
+    AT 만료 시 쿠키에 담겨오는 RT를 활용하여 AT를 refresh합니다.(추가 보안 작업 하면서 RT refresh도 함께 진행될 예정)`,
   })
-  async refreshToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const userRefreshToken = req.cookies['refreshToken'];
-    const { accessToken, refreshToken } = await this.authService.refreshToken(res, userRefreshToken);
-    this.authService.setRefreshToken(res, refreshToken);
+  async refreshToken(@JwtUserPayload() jwtUser: JwtPayloadInfo, @Res({ passthrough: true }) res: Response) {
+    const { accessToken } = await this.authService.generateTokens(jwtUser);
+    // this.authService.setRefreshToken(res, refreshToken); // TODO: 추가 보안 작업 및 RT refresh도 함께 진행할 것.
 
     return { accessToken };
   }

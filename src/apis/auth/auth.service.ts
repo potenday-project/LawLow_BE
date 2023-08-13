@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { UserPayloadInfo, CreateUserInfo } from 'src/common/types';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Provider, User } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import { LoginTicket, OAuth2Client, TokenPayload } from 'google-auth-library';
+import { Response } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -28,7 +29,7 @@ export class AuthService {
         throw new BadRequestException('잘못된 로그인 타입입니다.');
     }
 
-    let user: User = await this.usersService.findOne(oAuthUser.email);
+    let user: User = await this.usersService.findOneByEmail(oAuthUser.email);
 
     // 자동 회원가입
     if (!user) {
@@ -40,6 +41,46 @@ export class AuthService {
     const { accessToken, refreshToken } = await this.getTokens(userPayloadInfo);
 
     return { accessToken, refreshToken };
+  }
+
+  async refreshToken(res: Response, userRefreshToken: string) {
+    let userId: number;
+
+    if (!userRefreshToken) {
+      throw new UnauthorizedException('Refresh Token이 없습니다.');
+    }
+
+    try {
+      const payload = await this.verifyToken(userRefreshToken, {
+        isRefreshToken: true,
+      });
+      userId = payload.userId;
+    } catch (err) {
+      res.cookie('refreshToken', '', {
+        maxAge: 0,
+      });
+      throw new UnauthorizedException(err.message);
+    }
+
+    const user = await this.usersService.findOneById(userId);
+    if (!user) {
+      throw new UnauthorizedException('존재하지 않는 유저입니다.');
+    }
+
+    const { accessToken, refreshToken } = await this.getTokens(this.getUserPayloadInfo(user));
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  verifyToken(token: string, { isRefreshToken }: { isRefreshToken: boolean } = { isRefreshToken: false }) {
+    const payload: UserPayloadInfo | { userId: number } = this.jwtService.verify(token, {
+      secret: this.configService.get(`${isRefreshToken ? 'REFRESH' : 'ACCESS'}_SECRET_KEY`),
+    });
+
+    return payload;
   }
 
   private async loginWithGoogle(token: string): Promise<CreateUserInfo> {
@@ -69,7 +110,7 @@ export class AuthService {
 
   private getUserPayloadInfo(user: User): UserPayloadInfo {
     return {
-      id: user.id,
+      userId: user.id,
       email: user.email,
       name: user.name,
       profileImage: user.profileImage,
@@ -83,7 +124,7 @@ export class AuthService {
         expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
       }),
       this.jwtService.signAsync(
-        { id: user.id },
+        { userId: user.userId },
         {
           secret: this.configService.get('REFRESH_SECRET_KEY'),
           expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
@@ -95,5 +136,18 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  setRefreshToken(res: Response, refreshToken: string) {
+    res.cookie('refreshToken', refreshToken, {
+      domain:
+        this.configService.get('NODE_ENV') === 'development'
+          ? 'localhost'
+          : this.configService.get('COMMON_COOKIE_DOMAIN'),
+      httpOnly: true,
+      path: '/',
+      secure: this.configService.get('NODE_ENV') === 'production',
+      maxAge: 24 * 60 * 60 * 1000 * 14, // 14일
+    });
   }
 }

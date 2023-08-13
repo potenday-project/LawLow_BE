@@ -1,10 +1,11 @@
-import { Controller, Param, ParseEnumPipe, Body, Res, Post } from '@nestjs/common';
+import { Controller, Param, ParseEnumPipe, Body, Res, Req, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { Provider } from '@prisma/client';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { LoginDto } from './dtos/login.dto';
+import { RequestWithUser } from 'src/common/types';
 
 @Controller('auth')
 @ApiTags('Auth')
@@ -37,23 +38,26 @@ export class AuthController {
     },
   })
   async oAuthLogin(
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Param('login_type', new ParseEnumPipe(Provider))
     login_type: Provider,
     @Body() loginDto: LoginDto,
   ) {
     const { accessToken, refreshToken } = await this.authService.oAuthLogin(login_type, loginDto.token);
+    this.authService.setRefreshToken(res, refreshToken);
 
-    res.cookie('refreshToken', refreshToken, {
-      domain:
-        this.configService.get('NODE_ENV') === 'development'
-          ? 'localhost'
-          : this.configService.get('COMMON_COOKIE_DOMAIN'),
-      httpOnly: true,
-      path: '/',
-      secure: this.configService.get('NODE_ENV') === 'production',
-      maxAge: 24 * 60 * 60 * 1000 * 14, // 14일
-    });
+    return { accessToken };
+  }
+
+  @Post('/silent-refresh')
+  @ApiOperation({
+    summary: '토큰 리프레시 API',
+    description: 'refreshToken을 활용하여 accessToken과 refreshToken을 refresh합니다.',
+  })
+  async refreshToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const userRefreshToken = req.cookies['refreshToken'];
+    const { accessToken, refreshToken } = await this.authService.refreshToken(res, userRefreshToken);
+    this.authService.setRefreshToken(res, refreshToken);
 
     return { accessToken };
   }

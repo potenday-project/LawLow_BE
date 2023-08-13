@@ -7,12 +7,16 @@ import { CreateUserInfo } from '../../common/types';
 export class UsersService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async findOne(email: string): Promise<User> {
+  async findOneById(id: number): Promise<User> {
+    return await this.prismaService.user.findUnique({ where: { id } });
+  }
+
+  async findOneByEmail(email: string): Promise<User> {
     return await this.prismaService.user.findUnique({ where: { email } });
   }
 
   async create(user: CreateUserInfo, provider: Provider): Promise<User> {
-    const isExist = await this.findOne(user.email);
+    const isExist = await this.findOneByEmail(user.email);
     console.log('isExist: ', isExist, typeof isExist);
     if (isExist) {
       throw new BadRequestException('이미 존재하는 이메일의 유저입니다.');

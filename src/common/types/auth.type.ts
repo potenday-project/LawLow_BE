@@ -1,5 +1,7 @@
+import { Request } from 'express';
+
 export interface UserPayloadInfo {
-  id: number;
+  userId: number;
   name: string;
   email: string;
   profileImage: string;
@@ -10,4 +12,8 @@ export interface CreateUserInfo {
   email: string;
   name: string;
   photo: string;
+}
+
+export interface RequestWithUser extends Request {
+  user: UserPayloadInfo;
 }

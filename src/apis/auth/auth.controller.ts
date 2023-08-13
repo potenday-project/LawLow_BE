@@ -5,7 +5,6 @@ import { Provider } from '@prisma/client';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { LoginDto } from './dtos/login.dto';
-import { RequestWithUser } from 'src/common/types';
 
 @Controller('auth')
 @ApiTags('Auth')

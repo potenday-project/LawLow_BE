@@ -45,6 +45,7 @@ jobs:
             export NVM_DIR=~/.nvm
             source ~/.nvm/nvm.sh
             yarn install
+            npx prisma generate
             yarn build
             pm2 reload all --update-env
 

@@ -1,44 +1,70 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { Request, Response } from 'express';
-import { PassportGoogleUser, UserPayloadInfo } from 'src/common/types';
+import { UserPayloadInfo, CreateUserInfo } from 'src/common/types';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Provider, User } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
+import { LoginTicket, OAuth2Client, TokenPayload } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger('AuthService');
+
   constructor(
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
   ) {}
 
-  async OAuthLogin(req: Request & PassportGoogleUser, res: Response, provider: Provider) {
-    let user = await this.usersService.findOne(req.user.email);
+  async oAuthLogin(login_type: Provider, token: string): Promise<{ accessToken: string; refreshToken: string }> {
+    let oAuthUser: CreateUserInfo;
+    switch (login_type) {
+      case Provider.google:
+        oAuthUser = await this.loginWithGoogle(token);
+        break;
+
+      default:
+        throw new BadRequestException('잘못된 로그인 타입입니다.');
+    }
+
+    let user: User = await this.usersService.findOne(oAuthUser.email);
 
     // 자동 회원가입
     if (!user) {
-      user = await this.usersService.create(req.user, provider);
+      user = await this.usersService.create(oAuthUser, login_type);
     }
 
     // 토큰 발급
     const userPayloadInfo = this.getUserPayloadInfo(user);
-    const { refreshToken } = await this.getTokens(userPayloadInfo);
+    const { accessToken, refreshToken } = await this.getTokens(userPayloadInfo);
 
-    res.cookie('refreshToken', refreshToken, {
-      domain:
-        this.configService.get('NODE_ENV') === 'development'
-          ? 'localhost'
-          : this.configService.get('COMMON_COOKIE_DOMAIN'),
-      httpOnly: true,
-      path: '/',
-      secure: this.configService.get('NODE_ENV') === 'production',
-      maxAge: 24 * 60 * 60 * 1000 * 14, // 14일
-    });
-    res.redirect(`https://${this.configService.get('CLIENT_BASE_URL')}/login/success`);
+    return { accessToken, refreshToken };
+  }
 
-    return;
+  private async loginWithGoogle(token: string): Promise<CreateUserInfo> {
+    let account: CreateUserInfo;
+    const clientId: string = this.configService.get('GOOGLE_CLIENT_ID_PROD');
+    const client: OAuth2Client = new OAuth2Client(clientId);
+    try {
+      const ticket: LoginTicket = await client.verifyIdToken({
+        idToken: token,
+        audience: clientId,
+      });
+      const payload: TokenPayload = ticket.getPayload();
+
+      account = {
+        social_id: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        photo: payload.picture,
+      };
+    } catch (err) {
+      this.logger.warn(err);
+      throw new BadRequestException('잘못된 토큰입니다.');
+    }
+
+    return account;
   }
 
   private getUserPayloadInfo(user: User): UserPayloadInfo {

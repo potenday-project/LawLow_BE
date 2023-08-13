@@ -5,17 +5,8 @@ export interface UserPayloadInfo {
   profileImage: string;
 }
 
-export interface PassportGoogleUser {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    photo: string;
-  };
-}
-
 export interface CreateUserInfo {
-  id: string;
+  social_id: string;
   email: string;
   name: string;
   photo: string;

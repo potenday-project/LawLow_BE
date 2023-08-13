@@ -18,7 +18,7 @@ export class UsersService {
       throw new BadRequestException('이미 존재하는 이메일의 유저입니다.');
     }
     const isExistOAuthId = await this.prismaService.oauthid.findUnique({
-      where: { id: user.id },
+      where: { id: user.social_id },
     });
     if (isExistOAuthId) {
       throw new BadRequestException('이미 존재하는 소설 계정입니다.');
@@ -35,7 +35,7 @@ export class UsersService {
 
       await tx.oauthid.create({
         data: {
-          id: user.id,
+          id: user.social_id,
           provider,
           userId: newUser.id,
         },

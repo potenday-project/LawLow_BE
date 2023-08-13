@@ -55,8 +55,10 @@ export class LawsController {
   @Post(':type/:id/summary')
   @ApiOperation({
     summary: '판례/법령 요약 조회',
-    description:
-      "'더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다. \n\n '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.",
+    description: `
+      '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n
+      '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.
+      `,
   })
   @Throttle(4, 60)
   @ApiParam({

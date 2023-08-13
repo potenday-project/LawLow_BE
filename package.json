@@ -22,7 +22,7 @@
     "dbpull:prod": "dotenv -e .env.production.env -- npx prisma db pull",
     "dbmigrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
     "dbmigrate:prod": "dotenv -e .env.production -- npx prisma migrate dev",
-    "dbpush:dev": "dotenv -e .env.development.development.env -- npx prisma db push",
+    "dbpush:dev": "dotenv -e .env.development -- npx prisma db push",
     "dbpush:prod": "dotenv -e .env.production -- npx prisma db push"
   },
   "dependencies": {

@@ -9,7 +9,7 @@ export class UsersService {
 
   async findOneByOAuthId(oauthId: string, loginType: Provider): Promise<User> {
     return await this.prismaService.user.findFirst({
-      where: { oauthIds: { some: { provider: loginType, id: oauthId } } },
+      where: { userOauths: { some: { provider: loginType, oauthId } } },
     });
   }
 
@@ -27,7 +27,7 @@ export class UsersService {
     if (isExistEmail) {
       throw new BadRequestException('이미 존재하는 이메일입니다.');
     }
-    const isExistOAuthId = await this.findOneByOAuthId(user.social_id, provider);
+    const isExistOAuthId = await this.findOneByOAuthId(user.oauthId, provider);
     if (isExistOAuthId) {
       throw new BadRequestException('이미 존재하는 소설 계정입니다.');
     }
@@ -42,9 +42,9 @@ export class UsersService {
         },
       });
 
-      await tx.oauthid.create({
+      await tx.userOauth.create({
         data: {
-          id: user.social_id,
+          oauthId: user.oauthId,
           provider,
           userId: newUser.id,
         },

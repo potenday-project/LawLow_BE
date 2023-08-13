@@ -5,7 +5,7 @@ export interface JwtPayloadInfo {
 }
 
 export interface CreateUserInfo {
-  social_id: string;
+  oauthId: string;
   email: string;
   name: string;
   photo: string;

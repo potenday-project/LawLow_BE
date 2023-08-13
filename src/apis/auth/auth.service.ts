@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtPayloadInfo, CreateUserInfo } from 'src/common/types';
 import { ConfigService } from '@nestjs/config';
@@ -30,7 +30,7 @@ export class AuthService {
         throw new BadRequestException('잘못된 로그인 타입입니다.');
     }
 
-    let user: User = await this.usersService.findOneByOAuthId(oAuthUser.social_id, loginType);
+    let user: User = await this.usersService.findOneByOAuthId(oAuthUser.oauthId, loginType);
 
     // 자동 회원가입
     if (!user) {
@@ -65,7 +65,7 @@ export class AuthService {
       const payload: TokenPayload = ticket.getPayload();
 
       account = {
-        social_id: payload.sub,
+        oauthId: payload.sub,
         email: payload.email,
         name: payload.name,
         photo: payload.picture,

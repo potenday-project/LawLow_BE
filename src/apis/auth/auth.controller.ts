@@ -1,4 +1,4 @@
-import { Controller, Param, ParseEnumPipe, Body, Res, Req, Post, UseGuards } from '@nestjs/common';
+import { Controller, Param, ParseEnumPipe, Body, Res, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { Provider } from '@prisma/client';
@@ -61,7 +61,7 @@ export class AuthController {
     description: `
     AT 만료 시 쿠키에 담겨오는 RT를 활용하여 AT를 refresh합니다.(추가 보안 작업 하면서 RT refresh도 함께 진행될 예정)`,
   })
-  async refreshToken(@JwtUserPayload() jwtUser: JwtPayloadInfo, @Res({ passthrough: true }) res: Response) {
+  async refreshToken(@JwtUserPayload() jwtUser: JwtPayloadInfo) {
     const { accessToken } = await this.authService.generateTokens(jwtUser);
     // this.authService.setRefreshToken(res, refreshToken); // TODO: 추가 보안 작업 및 RT refresh도 함께 진행할 것.
 

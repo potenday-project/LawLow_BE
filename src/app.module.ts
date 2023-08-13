@@ -10,6 +10,8 @@ import { NestModule } from '@nestjs/common';
 import { MiddlewareConsumer } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
 import { SharedModule } from './shared/shared.module';
+import { AuthModule } from './apis/auth/auth.module';
+import { UsersModule } from './apis/users/users.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 
 @Module({
@@ -20,6 +22,8 @@ import { PrismaModule } from './common/prisma/prisma.module';
     }),
     PrismaModule,
     SharedModule,
+    AuthModule,
+    UsersModule,
     LawModule,
     HealthCheckerModule,
   ],

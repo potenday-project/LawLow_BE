@@ -12,6 +12,10 @@ export class SuccessInterceptor implements NestInterceptor {
           return { success: data };
         }
 
+        if (!data) {
+          return { success: true };
+        }
+
         const success = data.success;
         if (typeof data.success === 'boolean') delete data.success;
 

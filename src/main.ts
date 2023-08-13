@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { setupSwagger } from './swagger-setting';
 import { HttpStatus } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -11,8 +12,14 @@ async function bootstrap() {
       process.env.NODE_ENV === 'development' ? ['error', 'warn', 'log', 'verbose', 'debug'] : ['error', 'warn', 'log'],
   });
 
+  const configService = app.select(AppModule).get(ConfigService);
+
   app.enableCors({
-    origin: '*',
+    origin: [
+      configService.get('CLIENT_URL'),
+      configService.get('CLIENT_LOCAL_URL1'),
+      configService.get('CLIENT_LOCAL_URL2'),
+    ],
     credentials: true,
   });
 
@@ -29,8 +36,8 @@ async function bootstrap() {
 
   setupSwagger(app);
 
-  await app.listen(process.env.PORT, () => {
-    console.log(`Server is listening on port ${process.env.PORT}`);
+  await app.listen(configService.get('PORT'), () => {
+    console.log(`Server is listening on port ${configService.get('PORT')}`);
   });
 }
 bootstrap();

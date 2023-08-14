@@ -19,3 +19,10 @@ export enum AuthGuardType {
   ACCESS = 'access',
   REFRESH = 'refresh',
 }
+
+export interface GetUserInfo {
+  userId: number;
+  email: string;
+  name: string;
+  profileImageUrl: string;
+}

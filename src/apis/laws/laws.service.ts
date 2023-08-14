@@ -260,41 +260,20 @@ export class LawsService {
       return { summary: onlySummaryResponse.choices[0].message.content };
     }
 
-    // 판례는 요약받은 내용으로 제목과 키워드를 추출하고, 법령은 본문으로 제목과 키워드를 추출
-    switch (type) {
-      case 'prec':
-        const precOnlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
-        const detailsForTitleAndKeywords = precOnlySummaryResponse.choices[0].message.content.replace(/\n/g, '');
-        const { easyTitle: precEasyTitle, keywords: precKeywords } = await this.fetchTitleAndKeywords(
-          detailsForTitleAndKeywords,
-          MAX_RETRY_KEYWORD_TITLE_COUNT,
-        );
+    const [onlySummaryResponse, { easyTitle: easyTitle, keywords: keywords }] = await Promise.all([
+      this.openAiService.createAIChatCompletion(onlySummaryReqMsgs),
+      this.fetchTitleAndKeywords(lawDetail as PrecDetailData, MAX_RETRY_KEYWORD_TITLE_COUNT),
+    ]);
 
-        return {
-          easyTitle: precEasyTitle,
-          summary: detailsForTitleAndKeywords,
-          keywords: precKeywords,
-        };
-
-      case 'statute':
-        const [onlySummaryResponse, { easyTitle: statuteEasyTitle, keywords: statuteKeywords }] = await Promise.all([
-          this.openAiService.createAIChatCompletion(onlySummaryReqMsgs),
-          this.fetchTitleAndKeywords(lawDetail as StatuteDetailData, MAX_RETRY_KEYWORD_TITLE_COUNT),
-        ]);
-
-        return {
-          easyTitle: statuteEasyTitle,
-          summary: onlySummaryResponse.choices[0].message.content,
-          keywords: statuteKeywords,
-        };
-
-      default:
-        throw new BadRequestException('잘못된 타입입니다.');
-    }
+    return {
+      easyTitle,
+      summary: onlySummaryResponse.choices[0].message.content,
+      keywords,
+    };
   }
 
   private async fetchTitleAndKeywords(
-    summaryContent: StatuteDetailData | string,
+    summaryContent: StatuteDetailData | PrecDetailData,
     retryCount = 2,
   ): Promise<{ easyTitle: string; keywords: string[] }> {
     const titleKeywordReqMessages = await this.generateSummaryReqMessasges(summaryContent);

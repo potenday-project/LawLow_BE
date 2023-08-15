@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpenAI } from 'openai';
+import { Stream } from 'openai/streaming';
 import { ConfigService } from '@nestjs/config';
 import { encoding_for_model } from '@dqbd/tiktoken';
 import { TiktokenModel } from '@dqbd/tiktoken';
+import { Response } from 'express';
 
 @Injectable()
 export class OpenaiService {
@@ -25,6 +27,47 @@ export class OpenaiService {
     const chatCompletion = await this.openai.chat.completions.create(requestData);
 
     return chatCompletion;
+  }
+
+  async createAIStramChatCompletion(
+    promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const requestData = this.generateOpenAIChatRequestData(promptMessages);
+    const stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk> = await this.openai.chat.completions.create({
+      ...requestData,
+      stream: true,
+    });
+
+    const encoder = new TextEncoder();
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const str = typeof chunk === 'string' ? chunk : JSON.stringify(chunk);
+          const bytes = encoder.encode(str);
+          controller.enqueue(bytes);
+        }
+      },
+    });
+
+    return readableStream;
+  }
+
+  async sendResWithReadableStream(res: Response, readableStream: ReadableStream<Uint8Array>) {
+    const reader = readableStream.getReader();
+
+    const readAllChunks = async () => {
+      const { value, done } = await reader.read();
+      if (done) {
+        res.end();
+        return;
+      }
+
+      res.write(value); // 클라이언트에 chunk data를 write
+      readAllChunks(); // 스트림이 소진될 때까지 재귀 호출
+    };
+
+    readAllChunks();
   }
 
   private generateOpenAIChatRequestData(promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>): {

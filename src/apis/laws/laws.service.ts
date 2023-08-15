@@ -272,6 +272,21 @@ export class LawsService {
     };
   }
 
+  async createLawStreamSummary(
+    type: SearchTabEnum,
+    id: number,
+    recentSummaryMsg: string,
+  ): Promise<ReadableStream<any>> {
+    const lawDetail = await this.getLawDetail(type, id);
+
+    const summaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
+      onlySummary: true,
+    });
+    const summaryReadableStream = await this.openAiService.createAIStramChatCompletion(summaryReqMsgs);
+
+    return summaryReadableStream;
+  }
+
   private async fetchTitleAndKeywords(
     summaryContent: StatuteDetailData | PrecDetailData,
     retryCount = 2,

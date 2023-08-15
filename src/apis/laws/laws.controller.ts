@@ -1,4 +1,4 @@
-import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body, ParseIntPipe } from '@nestjs/common';
+import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body, ParseIntPipe, Res } from '@nestjs/common';
 import { LawsService } from './laws.service';
 import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import { getLawListDto } from './dtos/get-law.dto';
@@ -11,11 +11,13 @@ import {
   LawSummaryResponseData,
 } from 'src/common/types';
 import { Throttle } from '@nestjs/throttler';
+import { Response } from 'express';
+import { OpenaiService } from 'src/shared/services/openai.service';
 
 @Controller('laws')
 @ApiTags('Laws')
 export class LawsController {
-  constructor(private readonly lawsService: LawsService) {}
+  constructor(private readonly lawsService: LawsService, private readonly openaiService: OpenaiService) {}
 
   @Get(':type')
   @ApiOperation({ summary: '판례/법령 목록 조회' })
@@ -57,8 +59,7 @@ export class LawsController {
     summary: '판례/법령 요약 조회',
     description: `
       '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n
-      '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.
-      `,
+      '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.`,
   })
   @Throttle(4, 60)
   @ApiParam({
@@ -187,5 +188,36 @@ export class LawsController {
     @Body() requestSummaryDto?: RequestSummaryDto,
   ): Promise<LawSummaryResponseData> {
     return this.lawsService.createLawSummary(type, id, requestSummaryDto.recentSummaryMsg);
+  }
+
+  @Post(':type/:id/summary-stream')
+  @ApiOperation({
+    summary: '판례/법령 요약 조회 - stream version',
+    description: `
+      '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n\n
+      stream 버전은 요청에 대한 응답이 ReadableStream으로 제공됩니다.(요약 제목, 키워드 제외한 본문 요약 내용만 제공됩니다.)`,
+  })
+  @ApiParam({
+    name: 'type',
+    enum: SearchTabEnum,
+    description: 'prec: 판례, statute: 법령',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
+  })
+  async createLawStreamSummary(
+    @Res() res: Response,
+    @Param('type', new ParseEnumPipe(SearchTabEnum))
+    type: SearchTabEnum,
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() requestSummaryDto?: RequestSummaryDto,
+  ) {
+    const lawSummaryReadableStream: ReadableStream<Uint8Array> = await this.lawsService.createLawStreamSummary(
+      type,
+      id,
+      requestSummaryDto.recentSummaryMsg,
+    );
+    return this.openaiService.sendResWithReadableStream(res, lawSummaryReadableStream);
   }
 }

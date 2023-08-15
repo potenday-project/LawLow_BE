@@ -20,7 +20,8 @@ import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
 import { getLawListDto } from './dtos/get-law.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
-import { OpenAI } from 'openai';
+import { ChatCompletionMessage } from 'openai/resources/chat';
+
 interface GetLawListParams {
   type: SearchTabEnum;
   q: string;
@@ -272,11 +273,7 @@ export class LawsService {
     };
   }
 
-  async createLawStreamSummary(
-    type: SearchTabEnum,
-    id: number,
-    recentSummaryMsg: string,
-  ): Promise<ReadableStream<any>> {
+  async createLawStreamSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string) {
     const lawDetail = await this.getLawDetail(type, id);
 
     const summaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
@@ -325,14 +322,14 @@ export class LawsService {
     { onlySummary }: { onlySummary?: boolean } = {
       onlySummary: false,
     },
-  ): Promise<Array<OpenAI.Chat.Completions.ChatCompletionMessage>> {
+  ): Promise<Array<ChatCompletionMessage>> {
     const isFirstSummary = !recentSummaryMsg;
     const initContent = onlySummary
       ? this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY')
       : isFirstSummary
       ? this.configService.get('LAW_SUMMARY_INIT_PROMPT')
       : this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY');
-    const messages: Array<OpenAI.Chat.Completions.ChatCompletionMessage> = [
+    const messages: Array<ChatCompletionMessage> = [
       {
         role: 'system',
         content: initContent,

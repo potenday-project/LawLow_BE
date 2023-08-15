@@ -13,6 +13,8 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { OpenaiService } from 'src/shared/services/openai.service';
+import { Stream } from 'openai/streaming';
+import { ChatCompletionChunk } from 'openai/resources/chat';
 
 @Controller('laws')
 @ApiTags('Laws')
@@ -56,7 +58,7 @@ export class LawsController {
 
   @Post(':type/:id/summary')
   @ApiOperation({
-    summary: '판례/법령 요약 조회',
+    summary: '판례/법령 요약 요청',
     description: `
       '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n
       '더 쉽게 해석' 요청인 경우, summary만 제공됩니다.`,
@@ -192,10 +194,11 @@ export class LawsController {
 
   @Post(':type/:id/summary-stream')
   @ApiOperation({
-    summary: '판례/법령 요약 조회 - stream version',
+    summary: '판례/법령 요약 요청 - stream version',
     description: `
       '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n\n
-      stream 버전은 요청에 대한 응답이 ReadableStream으로 제공됩니다.(요약 제목, 키워드 제외한 본문 요약 내용만 제공됩니다.)`,
+      stream 버전 요약 API는 Chunk Data가 응답으로 제공됩니다. 클라이언트에서는 ReadableStream 형태로 받으시면 됩니다. (제목, 키워드를 제외한 본문 요약 내용만 제공됩니다.)
+      `,
   })
   @ApiParam({
     name: 'type',
@@ -213,11 +216,11 @@ export class LawsController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
   ) {
-    const lawSummaryReadableStream: ReadableStream<Uint8Array> = await this.lawsService.createLawStreamSummary(
+    const lawSummaryReadableStream: Stream<ChatCompletionChunk> = await this.lawsService.createLawStreamSummary(
       type,
       id,
       requestSummaryDto.recentSummaryMsg,
     );
-    return this.openaiService.sendResWithReadableStream(res, lawSummaryReadableStream);
+    return this.openaiService.sendResWithOpenAIStream(res, lawSummaryReadableStream);
   }
 }

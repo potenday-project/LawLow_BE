@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { Stream } from 'openai/streaming';
+import { ChatCompletionChunk, ChatCompletionMessage, ChatCompletion } from 'openai/resources/chat';
 import { ConfigService } from '@nestjs/config';
 import { encoding_for_model } from '@dqbd/tiktoken';
 import { TiktokenModel } from '@dqbd/tiktoken';
@@ -20,9 +21,7 @@ export class OpenaiService {
     }); // singleton
   }
 
-  async createAIChatCompletion(
-    promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>,
-  ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  async createAIChatCompletion(promptMessages: Array<ChatCompletionMessage>): Promise<ChatCompletion> {
     const requestData = this.generateOpenAIChatRequestData(promptMessages);
     const chatCompletion = await this.openai.chat.completions.create(requestData);
 
@@ -30,49 +29,32 @@ export class OpenaiService {
   }
 
   async createAIStramChatCompletion(
-    promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>,
-  ): Promise<ReadableStream<Uint8Array>> {
+    promptMessages: Array<ChatCompletionMessage>,
+  ): Promise<Stream<ChatCompletionChunk>> {
     const requestData = this.generateOpenAIChatRequestData(promptMessages);
-    const stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk> = await this.openai.chat.completions.create({
+    const stream: Stream<ChatCompletionChunk> = await this.openai.chat.completions.create({
       ...requestData,
       stream: true,
     });
 
+    return stream;
+  }
+
+  async sendResWithOpenAIStream(res: Response, opanAIStream: Stream<ChatCompletionChunk>): Promise<void> {
     const encoder = new TextEncoder();
 
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        for await (const chunk of stream) {
-          const str = typeof chunk === 'string' ? chunk : JSON.stringify(chunk);
-          const bytes = encoder.encode(str);
-          controller.enqueue(bytes);
-        }
-      },
-    });
+    for await (const part of opanAIStream) {
+      const str = typeof part === 'string' ? part : JSON.stringify(part);
+      const bytes = encoder.encode(str);
+      res.write(bytes);
+    }
 
-    return readableStream;
+    res.end();
   }
 
-  async sendResWithReadableStream(res: Response, readableStream: ReadableStream<Uint8Array>) {
-    const reader = readableStream.getReader();
-
-    const readAllChunks = async () => {
-      const { value, done } = await reader.read();
-      if (done) {
-        res.end();
-        return;
-      }
-
-      res.write(value); // 클라이언트에 chunk data를 write
-      readAllChunks(); // 스트림이 소진될 때까지 재귀 호출
-    };
-
-    readAllChunks();
-  }
-
-  private generateOpenAIChatRequestData(promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>): {
+  private generateOpenAIChatRequestData(promptMessages: Array<ChatCompletionMessage>): {
     model: TiktokenModel | 'gpt-3.5-turbo-16k';
-    messages: OpenAI.Chat.Completions.ChatCompletionMessage[];
+    messages: ChatCompletionMessage[];
   } {
     const { promptMessages: possiblePrompt, currentTokenCount } = this.convertChatPromptToPossible(promptMessages);
 
@@ -85,8 +67,8 @@ export class OpenaiService {
     };
   }
 
-  private convertChatPromptToPossible(promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>): {
-    promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>;
+  private convertChatPromptToPossible(promptMessages: Array<ChatCompletionMessage>): {
+    promptMessages: Array<ChatCompletionMessage>;
     currentTokenCount: number;
   } {
     let currentTokenCount = this.calculateTokensWithTiktoken(promptMessages);
@@ -117,7 +99,7 @@ export class OpenaiService {
     };
   }
 
-  private calculateTokensWithTiktoken(promptMessages: Array<OpenAI.Chat.Completions.ChatCompletionMessage>): number {
+  private calculateTokensWithTiktoken(promptMessages: Array<ChatCompletionMessage>): number {
     const gptModel: TiktokenModel = 'gpt-3.5-turbo';
     const enc = encoding_for_model(gptModel);
 

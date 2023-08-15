@@ -4101,10 +4101,10 @@ onetime@^5.1.0, onetime@^5.1.2:
   dependencies:
     mimic-fn "^2.1.0"
 
-openai@^4.0.0-beta.9:
-  version "4.0.0-beta.9"
-  resolved "https://registry.yarnpkg.com/openai/-/openai-4.0.0-beta.9.tgz#de41a74f7cd6fbbba17c99815457cb64c48b08fd"
-  integrity sha512-0sCeOpKiMDRkvPUDg2zvEVT/d1yhugnQIVdPunID2UrIHMNQGPuYBjvhwRrkAyravPX8jQy56sRKmFQYM3hEvw==
+openai@^4.0.0-beta.12:
+  version "4.0.0-beta.12"
+  resolved "https://registry.yarnpkg.com/openai/-/openai-4.0.0-beta.12.tgz#c8f8100a554f61b00f58211e62d23edd47d61bdb"
+  integrity sha512-K7PrIyF+Rv2kI8/FKcb1ZiM4L9ORR5J8DnoSgOT+mHrR9d3eBkAdxqVJ4uCXLFTGh7rDzU4pbuD+DpfdgzL1IQ==
   dependencies:
     "@types/node" "^18.11.18"
     "@types/node-fetch" "^2.6.4"

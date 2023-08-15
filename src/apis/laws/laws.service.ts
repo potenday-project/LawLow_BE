@@ -12,15 +12,15 @@ import {
   PrecDetailData,
   StatuteDetailData,
   StatuteArticle,
-  AIChatCompletionReqMsg,
   LawSummaryResponseData,
 } from 'src/common/types';
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
 import { getLawListDto } from './dtos/get-law.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
+import { OpenAI } from 'openai';
 interface GetLawListParams {
   type: SearchTabEnum;
   q: string;
@@ -310,14 +310,14 @@ export class LawsService {
     { onlySummary }: { onlySummary?: boolean } = {
       onlySummary: false,
     },
-  ): Promise<AIChatCompletionReqMsg[]> {
+  ): Promise<Array<OpenAI.Chat.Completions.ChatCompletionMessage>> {
     const isFirstSummary = !recentSummaryMsg;
     const initContent = onlySummary
       ? this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY')
       : isFirstSummary
       ? this.configService.get('LAW_SUMMARY_INIT_PROMPT')
       : this.configService.get('LAW_SUMMARY_INIT_PROMPT_ONLY_SUMMARY');
-    const messages: Array<AIChatCompletionReqMsg> = [
+    const messages: Array<OpenAI.Chat.Completions.ChatCompletionMessage> = [
       {
         role: 'system',
         content: initContent,

@@ -127,7 +127,7 @@ export class LawsService {
       await this.getLawDetail(lawType, lawId);
     } catch (error) {
       if (error.status === 404) {
-        throw new NotFoundException(`${lawText} 정보가 없습니다.`);
+        throw new BadRequestException(`올바르지 않은 ${lawText} 식별 ID입니다.`);
       }
       throw error;
     }
@@ -141,6 +141,7 @@ export class LawsService {
           lawType,
         },
       });
+
       return !!createdBookmark;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -153,29 +154,26 @@ export class LawsService {
   async deleteLawBookmark(userId: number, lawId: string, lawType: SearchTabEnum) {
     const lawText = lawType === SearchTabEnum.PRECEDENT ? '판례' : '법령';
 
-    try {
-      // delete bookmark
-      await this.prismaService.lawBookmark.update({
-        where: {
-          userId_lawId_lawType: {
-            userId,
-            lawId,
-            lawType,
-          },
-          deletedAt: null,
-        },
-        data: {
-          deletedAt: new Date(),
-        },
-      });
-
-      return;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        throw new BadRequestException(`저장된 ${lawText}가 없습니다.`);
-      }
-      throw error;
+    // exist bookmark
+    const existBookmark = await this.prismaService.lawBookmark.findFirst({
+      where: {
+        userId,
+        lawId,
+        lawType,
+        deletedAt: null,
+      },
+    });
+    if (!existBookmark) {
+      throw new BadRequestException(`저장된 ${lawText}가 없습니다.`);
     }
+
+    // delete bookmark
+    await this.prismaService.lawBookmark.update({
+      where: { id: existBookmark.id },
+      data: { deletedAt: new Date() },
+    });
+
+    return;
   }
 
   async getBookmarkedLaws(

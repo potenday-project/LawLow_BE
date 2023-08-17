@@ -42,7 +42,6 @@ model LawBookmark {
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(0)
   user      User      @relation(fields: [userId], references: [id])
 
-  @@unique([userId, lawId, lawType])
   @@index([userId, lawType], map: "LawBookmark_user_id_law_type_index")
 }
 

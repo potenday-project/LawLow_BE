@@ -182,7 +182,7 @@ export class LawsService {
     queryParams: GetBookmarkLawListDto,
   ): Promise<PageResponse<PrecDetailData[] | StatuteDetailData[]>> {
     const params: GetBookmarkLawListParams = { type: lawType, ...queryParams };
-    const where = {
+    const where: Prisma.LawBookmarkWhereInput = {
       userId,
       lawType,
       deletedAt: null,

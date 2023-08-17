@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, MessageEvent } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk, ChatCompletionMessage, ChatCompletion } from 'openai/resources/chat';
@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { encoding_for_model } from '@dqbd/tiktoken';
 import { TiktokenModel } from '@dqbd/tiktoken';
 import { Response } from 'express';
+import { Observable, Subscriber } from 'rxjs';
 
 @Injectable()
 export class OpenaiService {
@@ -40,14 +41,47 @@ export class OpenaiService {
     return stream;
   }
 
-  async sendResWithOpenAIStream(res: Response, opanAIStream: Stream<ChatCompletionChunk>): Promise<void> {
-    const encoder = new TextEncoder();
+  async sendSSEWithOpenAIStream(opanAIStream: Stream<ChatCompletionChunk>): Promise<Observable<MessageEvent>> {
+    return new Observable((subscriber: Subscriber<MessageEvent>) => {
+      this.sendStreamToObservableData(opanAIStream, subscriber);
+    });
+  }
+
+  private async sendStreamToObservableData(
+    opanAIStream: Stream<ChatCompletionChunk>,
+    subscriber: Subscriber<MessageEvent>,
+  ) {
+    for await (const part of opanAIStream) {
+      const content: string = part.choices[0]?.delta?.content;
+      if (content) {
+        subscriber.next({ data: content, retry: 1000 });
+      }
+    }
+
+    subscriber.next({
+      type: 'close',
+      data: 'true',
+    });
+
+    subscriber.complete();
+  }
+
+  // unused(legacy) code
+  async sendSSEResponseWithOpenAIStream(res: Response, opanAIStream: Stream<ChatCompletionChunk>): Promise<void> {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // SSE를 위해 지정된 헤더를 클라이언트에게 보냄
+
+    res.write('retry: 1000\n\n'); // 클라에서 연결이 끊기면 1초 간격으로 재연결을 시도하라는 의미
 
     for await (const part of opanAIStream) {
-      const str = typeof part === 'string' ? part : JSON.stringify(part);
-      const bytes = encoder.encode(str);
-      res.write(bytes);
+      const content: string = part.choices[0].delta.content;
+      content && res.write(`data: ${content}\n\n`);
     }
+
+    res.write(`event: close\n`);
+    res.write(`data: true\n\n`);
 
     res.end();
   }

@@ -7,9 +7,10 @@ import {
   Post,
   Body,
   ParseIntPipe,
-  Res,
   UseGuards,
   Delete,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
 import { LawsService } from './laws.service';
 import {
@@ -32,7 +33,6 @@ import {
   LawSummaryResponseData,
 } from 'src/common/types';
 import { Throttle } from '@nestjs/throttler';
-import { Response } from 'express';
 import { OpenaiService } from 'src/shared/services/openai.service';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk } from 'openai/resources/chat';
@@ -40,6 +40,7 @@ import { JwtUserPayload } from 'src/common/decorators/jwt-user.decorator';
 import { JwtPayloadInfo } from 'src/common/types';
 import { AuthGuard } from '@nestjs/passport';
 import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
+import { Observable, Subscriber } from 'rxjs';
 
 @Controller({ path: 'laws' })
 @ApiTags('Laws')
@@ -233,7 +234,7 @@ export class LawsController {
     return this.lawsService.createLawSummary(type, id.toString(), requestSummaryDto.recentSummaryMsg);
   }
 
-  @Post(':type/:id/summary-stream')
+  @Sse(':type/:id/summary-stream')
   @ApiOperation({
     summary: '판례/법령 요약 요청 - stream version',
     description: `
@@ -251,18 +252,16 @@ export class LawsController {
     description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
   })
   async createLawStreamSummary(
-    @Res() res: Response,
-    @Param('type', new ParseEnumPipe(SearchTabEnum))
-    type: SearchTabEnum,
+    @Param('type', new ParseEnumPipe(SearchTabEnum)) type: SearchTabEnum,
     @Param('id', new ParseIntPipe()) id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
-  ) {
+  ): Promise<Observable<MessageEvent>> {
     const lawSummaryReadableStream: Stream<ChatCompletionChunk> = await this.lawsService.createLawStreamSummary(
       type,
       id.toString(),
-      requestSummaryDto.recentSummaryMsg,
+      requestSummaryDto?.recentSummaryMsg,
     );
-    return this.openaiService.sendResWithOpenAIStream(res, lawSummaryReadableStream);
+    return this.openaiService.sendSSEWithOpenAIStream(lawSummaryReadableStream);
   }
 
   @Post(':type/:id/bookmark')

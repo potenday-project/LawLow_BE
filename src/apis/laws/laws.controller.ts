@@ -9,8 +9,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Delete,
-  Sse,
-  MessageEvent,
+  Res,
 } from '@nestjs/common';
 import { LawsService } from './laws.service';
 import {
@@ -40,7 +39,7 @@ import { JwtUserPayload } from 'src/common/decorators/jwt-user.decorator';
 import { JwtPayloadInfo } from 'src/common/types';
 import { AuthGuard } from '@nestjs/passport';
 import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
-import { Observable, Subscriber } from 'rxjs';
+import { Response } from 'express';
 
 @Controller({ path: 'laws' })
 @ApiTags('Laws')
@@ -259,12 +258,12 @@ export class LawsController {
     return this.lawsService.createLawAdditionalSummary(type, id.toString());
   }
 
-  @Sse(':type/:id/summary-stream')
+  @Post(':type/:id/summary-stream')
   @ApiOperation({
-    summary: '판례/법령 본문 요약 요청 - SSE stream version',
+    summary: '판례/법령 본문 요약 요청 - stream version',
     description: `
       '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n\n
-      stream 버전 요약 API는 SSE로 응답이 제공됩니다. 요약 완료 시에는 이름이 'close'인 SSE event에 'true'(문자열) 데이터가 담겨서 넘어갑니다.`,
+      stream 버전 요약 API는 chunk data가 응답으로 제공됩니다. 클라이언트에서는 ReadableStream 형태로 받으시면 됩니다.`,
   })
   @ApiParam({
     name: 'type',
@@ -303,16 +302,17 @@ export class LawsController {
     description: 'recentSummaryMsg: 직전에 제공받은 요약문을 입력합니다.',
   })
   async createLawStreamSummary(
+    @Res() res: Response,
     @Param('type', new ParseEnumPipe(SearchTabEnum)) type: SearchTabEnum,
     @Param('id', new ParseIntPipe()) id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
-  ): Promise<Observable<MessageEvent>> {
-    const lawSummaryReadableStream: Stream<ChatCompletionChunk> = await this.lawsService.createLawStreamSummary(
+  ): Promise<void> {
+    const lawSummaryStream: Stream<ChatCompletionChunk> = await this.lawsService.createLawStreamSummary(
       type,
       id.toString(),
       requestSummaryDto?.recentSummaryMsg,
     );
-    return this.openaiService.sendSSEWithOpenAIStream(lawSummaryReadableStream);
+    return this.openaiService.sendChunksWithOpenAIStream(res, lawSummaryStream);
   }
 
   @Post(':type/:id/bookmark')

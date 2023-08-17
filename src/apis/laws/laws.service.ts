@@ -132,9 +132,9 @@ export class LawsService {
     const summaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
       onlySummary: true,
     });
-    const summaryReadableStream = await this.openAiService.createAIStramChatCompletion(summaryReqMsgs);
+    const summaryStream = await this.openAiService.createAIStramChatCompletion(summaryReqMsgs);
 
-    return summaryReadableStream;
+    return summaryStream;
   }
 
   async postLawBookmark(userId: number, lawId: string, lawType: SearchTabEnum) {

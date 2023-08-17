@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import {
+  GetLawListParams,
   SearchRangeEnum,
   SearchTabEnum,
   RawLawDetailRes,
@@ -13,21 +14,18 @@ import {
   StatuteDetailData,
   StatuteArticle,
   LawSummaryResponseData,
+  GetBookmarkLawListParams,
 } from 'src/common/types';
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import convert from 'xml-js';
 import { fetchData } from 'src/common/utils';
-import { getLawListDto } from './dtos/get-law.dto';
+import { GetLawListDto } from './dtos/get-laws.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
 import { ChatCompletionMessage } from 'openai/resources/chat';
-
-interface GetLawListParams {
-  type: SearchTabEnum;
-  q: string;
-  page: number;
-  take: number;
-}
+import { PrismaService } from 'src/common/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
 
 @Injectable()
 export class LawsService {
@@ -35,11 +33,12 @@ export class LawsService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly openAiService: OpenaiService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async getLawList(
     type: SearchTabEnum,
-    queryParams: getLawListDto,
+    queryParams: GetLawListDto,
   ): Promise<PageResponse<StatuteDetailData[] | PrecDetailData[]>> {
     const params: GetLawListParams = { type, ...queryParams };
     const convertedLaws = await this.fetchConvertedLaws(params);
@@ -48,7 +47,7 @@ export class LawsService {
     if (!convertedLaws.PrecSearch?.prec && !convertedLaws.LawSearch?.law) {
       return {
         list: [],
-        ...this.generatePaginationData(convertedLaws, params, 0),
+        ...this.generatePaginationData({ convertedLaws, params, currentElementsCount: 0 }),
       };
     }
 
@@ -56,8 +55,172 @@ export class LawsService {
     const requestConfig = this.generateRequestConfig(params);
     const lawDetailList: TransformedCleanLawList = await Promise.all(lawIdList.map(this.fetchLawDetail(requestConfig)));
 
-    const paginationData = this.generatePaginationData(convertedLaws, params, lawIdList.length);
+    const paginationData = this.generatePaginationData({
+      convertedLaws,
+      params,
+      currentElementsCount: lawIdList.length,
+    });
     const responseData = this.generateResponseData(type, lawDetailList);
+
+    return {
+      list: responseData,
+      ...paginationData,
+    };
+  }
+
+  async getLawDetail(type: SearchTabEnum, id: string): Promise<StatuteDetailData | PrecDetailData> {
+    const params = {
+      type,
+    };
+    const requestConfig = this.generateRequestConfig(params);
+    const lawDetailList = await Promise.all([id].map(this.fetchLawDetail(requestConfig)));
+    if (!lawDetailList[0]) {
+      throw new NotFoundException(`해당하는 ${type === 'prec' ? '판례가' : '법령이'} 없습니다.`);
+    }
+    const responseData = this.generateResponseData(type, lawDetailList);
+
+    return responseData[0];
+  }
+
+  async createLawSummary(type: SearchTabEnum, id: string, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
+    const MAX_RETRY_KEYWORD_TITLE_COUNT = 2;
+    const lawDetail = await this.getLawDetail(type, id);
+
+    const onlySummaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
+      onlySummary: true,
+    });
+
+    const isFirstSummary = !recentSummaryMsg;
+    if (!isFirstSummary) {
+      const onlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
+      return { summary: onlySummaryResponse.choices[0].message.content };
+    }
+
+    const [onlySummaryResponse, { easyTitle: easyTitle, keywords: keywords }] = await Promise.all([
+      this.openAiService.createAIChatCompletion(onlySummaryReqMsgs),
+      this.fetchTitleAndKeywords(lawDetail as PrecDetailData, MAX_RETRY_KEYWORD_TITLE_COUNT),
+    ]);
+
+    return {
+      easyTitle,
+      summary: onlySummaryResponse.choices[0].message.content,
+      keywords,
+    };
+  }
+
+  async createLawStreamSummary(type: SearchTabEnum, id: string, recentSummaryMsg: string) {
+    const lawDetail = await this.getLawDetail(type, id);
+
+    const summaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
+      onlySummary: true,
+    });
+    const summaryReadableStream = await this.openAiService.createAIStramChatCompletion(summaryReqMsgs);
+
+    return summaryReadableStream;
+  }
+
+  async postLawBookmark(userId: number, lawId: string, lawType: SearchTabEnum) {
+    const lawText = lawType === SearchTabEnum.PRECEDENT ? '판례' : '법령';
+
+    // check exist
+    try {
+      await this.getLawDetail(lawType, lawId);
+    } catch (error) {
+      if (error.status === 404) {
+        throw new NotFoundException(`${lawText} 정보가 없습니다.`);
+      }
+      throw error;
+    }
+
+    // create bookmark
+    try {
+      const createdBookmark = await this.prismaService.lawBookmark.create({
+        data: {
+          userId,
+          lawId,
+          lawType,
+        },
+      });
+      return !!createdBookmark;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestException(`이미 저장한 ${lawText}입니다.`);
+      }
+      throw error;
+    }
+  }
+
+  async deleteLawBookmark(userId: number, lawId: string, lawType: SearchTabEnum) {
+    const lawText = lawType === SearchTabEnum.PRECEDENT ? '판례' : '법령';
+
+    try {
+      // delete bookmark
+      await this.prismaService.lawBookmark.update({
+        where: {
+          userId_lawId_lawType: {
+            userId,
+            lawId,
+            lawType,
+          },
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      return;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new BadRequestException(`저장된 ${lawText}가 없습니다.`);
+      }
+      throw error;
+    }
+  }
+
+  async getBookmarkedLaws(
+    userId: number,
+    lawType: SearchTabEnum,
+    queryParams: GetBookmarkLawListDto,
+  ): Promise<PageResponse<PrecDetailData[] | StatuteDetailData[]>> {
+    const params: GetBookmarkLawListParams = { type: lawType, ...queryParams };
+    const where = {
+      userId,
+      lawType,
+      deletedAt: null,
+    };
+
+    const bookmarksCount = await this.prismaService.lawBookmark.count({ where });
+    const bookmarks = await this.prismaService.lawBookmark.findMany({
+      where,
+      take: params.take,
+      skip: (params.page - 1) * params.take,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (bookmarksCount === 0) {
+      return {
+        list: [],
+        ...this.generatePaginationData({
+          params,
+          totalCountParam: 0,
+          currentElementsCount: 0,
+        }),
+      };
+    }
+
+    const lawIdList = bookmarks.map((bookmark) => bookmark.lawId);
+    const lawDetailRequestConfig = this.generateRequestConfig({ type: lawType });
+    const lawDetailList: TransformedCleanLawList = await Promise.all(
+      lawIdList.map(this.fetchLawDetail(lawDetailRequestConfig)),
+    );
+
+    const responseData = this.generateResponseData(lawType, lawDetailList);
+    const paginationData = this.generatePaginationData({
+      params,
+      totalCountParam: bookmarksCount,
+      currentElementsCount: lawIdList.length,
+    });
 
     return {
       list: responseData,
@@ -91,7 +254,7 @@ export class LawsService {
 
   private fetchLawDetail =
     (requestConfig: ReturnType<typeof this.generateRequestConfig>) =>
-    async (lawId: number): Promise<TransformedCleanDataEntry | TransformedCleanDataEntry[]> => {
+    async (lawId: string): Promise<TransformedCleanDataEntry | TransformedCleanDataEntry[]> => {
       const lawDetail = await fetchData(this.httpService, 'http://www.law.go.kr/DRF/lawService.do', {
         params: {
           ID: lawId,
@@ -109,7 +272,7 @@ export class LawsService {
       return this.transformCleanLawData(detailData);
     };
 
-  private getLawIdList(lawList: LawListApiResponse): number[] {
+  private getLawIdList(lawList: LawListApiResponse): string[] {
     if (lawList.PrecSearch) {
       if (Array.isArray(lawList.PrecSearch.prec)) {
         return lawList.PrecSearch.prec.map((prec) => prec.판례일련번호._text);
@@ -149,14 +312,20 @@ export class LawsService {
     return transformedData;
   };
 
-  private generatePaginationData(
-    convertedLaws: LawListApiResponse,
-    params: GetLawListParams,
-    currentElementsCount: number,
-  ): Omit<PageResponse<TransformedCleanLawList>, 'list'> {
+  private generatePaginationData({
+    params,
+    currentElementsCount,
+    totalCountParam,
+    convertedLaws,
+  }: {
+    params: GetLawListParams | GetBookmarkLawListParams;
+    currentElementsCount: number;
+    totalCountParam?: number;
+    convertedLaws?: LawListApiResponse;
+  }): Omit<PageResponse<TransformedCleanLawList>, 'list'> {
     const { type, page, take } = params;
     const lawListKey = type === 'prec' ? 'PrecSearch' : 'LawSearch';
-    const totalCount = convertedLaws[lawListKey].totalCnt._text;
+    const totalCount = totalCountParam || convertedLaws[lawListKey].totalCnt._text;
     const totalPages = Math.ceil(totalCount / take);
 
     return {
@@ -231,57 +400,6 @@ export class LawsService {
     } else {
       return transformSingleArticle(statuteArticleData);
     }
-  }
-
-  async getLawDetail(type: SearchTabEnum, id: number): Promise<StatuteDetailData | PrecDetailData> {
-    const params = {
-      type,
-    };
-    const requestConfig = this.generateRequestConfig(params);
-    const lawDetailList = await Promise.all([id].map(this.fetchLawDetail(requestConfig)));
-    if (!lawDetailList[0]) {
-      throw new NotFoundException(`해당하는 ${type === 'prec' ? '판례가' : '법령이'} 없습니다.`);
-    }
-    const responseData = this.generateResponseData(type, lawDetailList);
-
-    return responseData[0];
-  }
-
-  async createLawSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string): Promise<LawSummaryResponseData> {
-    const MAX_RETRY_KEYWORD_TITLE_COUNT = 2;
-    const lawDetail = await this.getLawDetail(type, id);
-
-    const onlySummaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
-      onlySummary: true,
-    });
-
-    const isFirstSummary = !recentSummaryMsg;
-    if (!isFirstSummary) {
-      const onlySummaryResponse = await this.openAiService.createAIChatCompletion(onlySummaryReqMsgs);
-      return { summary: onlySummaryResponse.choices[0].message.content };
-    }
-
-    const [onlySummaryResponse, { easyTitle: easyTitle, keywords: keywords }] = await Promise.all([
-      this.openAiService.createAIChatCompletion(onlySummaryReqMsgs),
-      this.fetchTitleAndKeywords(lawDetail as PrecDetailData, MAX_RETRY_KEYWORD_TITLE_COUNT),
-    ]);
-
-    return {
-      easyTitle,
-      summary: onlySummaryResponse.choices[0].message.content,
-      keywords,
-    };
-  }
-
-  async createLawStreamSummary(type: SearchTabEnum, id: number, recentSummaryMsg: string) {
-    const lawDetail = await this.getLawDetail(type, id);
-
-    const summaryReqMsgs = await this.generateSummaryReqMessasges(lawDetail, recentSummaryMsg, {
-      onlySummary: true,
-    });
-    const summaryReadableStream = await this.openAiService.createAIStramChatCompletion(summaryReqMsgs);
-
-    return summaryReadableStream;
   }
 
   private async fetchTitleAndKeywords(

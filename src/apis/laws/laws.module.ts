@@ -6,4 +6,4 @@ import { LawsService } from './laws.service';
   controllers: [LawsController],
   providers: [LawsService],
 })
-export class LawModule {}
+export class LawsModule {}

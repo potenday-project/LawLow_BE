@@ -1,3 +1,18 @@
+import { SearchTabEnum } from '../../common/types';
+
+interface GetLawListParams {
+  type: SearchTabEnum;
+  q: string;
+  page: number;
+  take: number;
+}
+
+interface GetBookmarkLawListParams {
+  type: SearchTabEnum;
+  page: number;
+  take: number;
+}
+
 interface RawDataEntry {
   _text?: string | number;
   _cdata?: string;
@@ -18,10 +33,10 @@ interface CommonConvertedElement<T> {
   _cdata?: string;
 }
 interface ConvertedPrecElement {
-  판례일련번호: CommonConvertedElement<number>;
+  판례일련번호: CommonConvertedElement<string>;
 }
 interface ConvertedStatuteElement {
-  법령ID: CommonConvertedElement<number>;
+  법령ID: CommonConvertedElement<string>;
 }
 interface LawListApiResponse {
   PrecSearch?: {
@@ -107,6 +122,8 @@ interface LawSummaryResponseData {
 }
 
 export {
+  GetLawListParams,
+  GetBookmarkLawListParams,
   LawListApiResponse,
   RawLawData,
   RawLawDetailRes,

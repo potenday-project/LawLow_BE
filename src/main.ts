@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { setupSwagger } from './common/swagger-setting';
 import { HttpStatus } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
@@ -19,6 +19,7 @@ async function bootstrap() {
       configService.get('CLIENT_URL'),
       configService.get('CLIENT_LOCAL_URL1'),
       configService.get('CLIENT_LOCAL_URL2'),
+      'http://localhost:4001',
     ],
     credentials: true,
   });
@@ -32,7 +33,10 @@ async function bootstrap() {
       errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
     }),
   );
-  app.enableVersioning();
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
 
   setupSwagger(app);
 

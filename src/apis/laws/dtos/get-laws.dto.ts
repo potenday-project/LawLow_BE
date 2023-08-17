@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import * as v from 'class-validator';
 
-export class getLawListDto implements SearchRequest {
+export class GetLawListDto implements SearchRequest {
   @ApiProperty({ required: true, description: '검색어' })
   @v.IsNotEmpty()
   @v.IsString()
@@ -16,10 +16,10 @@ export class getLawListDto implements SearchRequest {
   @v.Min(1)
   readonly page: number = 1;
 
-  @ApiProperty({ required: false, default: 10 })
+  @ApiProperty({ required: false, default: 5 })
   @v.IsOptional()
   @Transform(({ value }) => Number(value))
   @v.IsInt()
   @v.Min(1)
-  readonly take: number = 10;
+  readonly take: number = 5;
 }

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HealthCheckerModule } from './apis/health-checker/health-checker.module';
-import { LawModule } from './apis/laws/laws.module';
+import { LawsModule } from './apis/laws/laws.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
@@ -30,7 +30,7 @@ import { APP_GUARD } from '@nestjs/core';
     SharedModule,
     AuthModule,
     UsersModule,
-    LawModule,
+    LawsModule,
     HealthCheckerModule,
   ],
   providers: [

@@ -1,7 +1,28 @@
-import { Controller, Param, Query, Get, ParseEnumPipe, Post, Body, ParseIntPipe, Res } from '@nestjs/common';
+import {
+  Controller,
+  Param,
+  Query,
+  Get,
+  ParseEnumPipe,
+  Post,
+  Body,
+  ParseIntPipe,
+  Res,
+  UseGuards,
+  Delete,
+} from '@nestjs/common';
 import { LawsService } from './laws.service';
-import { ApiOperation, ApiTags, ApiParam, ApiBody, ApiResponse, ApiTooManyRequestsResponse } from '@nestjs/swagger';
-import { getLawListDto } from './dtos/get-law.dto';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiBody,
+  ApiTooManyRequestsResponse,
+  ApiCreatedResponse,
+  ApiBearerAuth,
+  ApiOkResponse,
+} from '@nestjs/swagger';
+import { GetLawListDto } from './dtos/get-laws.dto';
 import { RequestSummaryDto } from './dtos/request-summary.dto';
 import {
   PageResponse,
@@ -15,8 +36,12 @@ import { Response } from 'express';
 import { OpenaiService } from 'src/shared/services/openai.service';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk } from 'openai/resources/chat';
+import { JwtUserPayload } from 'src/common/decorators/jwt-user.decorator';
+import { JwtPayloadInfo } from 'src/common/types';
+import { AuthGuard } from '@nestjs/passport';
+import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
 
-@Controller('laws')
+@Controller({ path: 'laws' })
 @ApiTags('Laws')
 export class LawsController {
   constructor(private readonly lawsService: LawsService, private readonly openaiService: OpenaiService) {}
@@ -31,9 +56,32 @@ export class LawsController {
   getLawList(
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
-    @Query() queryParams: getLawListDto,
+    @Query() queryParams: GetLawListDto,
   ): Promise<PageResponse<StatuteDetailData[] | PrecDetailData[]>> {
     return this.lawsService.getLawList(type, queryParams);
+  }
+
+  @Get(':type/bookmarks')
+  @UseGuards(AuthGuard('jwt-access'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: '저장한 판례/법령 목록 요청',
+  })
+  @ApiParam({
+    name: 'type',
+    enum: SearchTabEnum,
+    description: 'prec: 판례, statute: 법령',
+  })
+  @ApiOkResponse({
+    description: 'Successfule response',
+  })
+  getBookmarkedLaws(
+    @JwtUserPayload() jwtUser: JwtPayloadInfo,
+    @Param('type', new ParseEnumPipe(SearchTabEnum))
+    type: SearchTabEnum,
+    @Query() queryParams: GetBookmarkLawListDto,
+  ) {
+    return this.lawsService.getBookmarkedLaws(jwtUser.userId, type, queryParams);
   }
 
   @Get(':type/:id')
@@ -53,7 +101,7 @@ export class LawsController {
     type: SearchTabEnum,
     @Param('id', new ParseIntPipe()) id: number,
   ): Promise<StatuteDetailData | PrecDetailData> {
-    return this.lawsService.getLawDetail(type, id);
+    return this.lawsService.getLawDetail(type, id.toString());
   }
 
   @Post(':type/:id/summary')
@@ -100,29 +148,22 @@ export class LawsController {
     required: false,
     description: 'recentSummaryMsg: 직전에 제공받은 요약문을 입력합니다.',
   })
-  @ApiResponse({
-    status: 201,
+  @ApiCreatedResponse({
     description: 'Successfule response',
     content: {
       'application/json': {
         examples: {
           '최초 요약 요청': {
             value: {
-              success: true,
-              data: {
-                easyTitle: '쉬운 제목',
-                summary: '요약문',
-                keywords: ['키워드1', '키워드2'],
-              },
+              easyTitle: '쉬운 제목',
+              summary: '요약문',
+              keywords: ['키워드1', '키워드2'],
             },
             description: '최초 요약 요청에 대한 응답',
           },
           '더 쉽게 해석': {
             value: {
-              success: true,
-              data: {
-                summary: '요약문',
-              },
+              summary: '요약문',
             },
             description: '더 쉽게 해석 요청에 대한 응답',
           },
@@ -189,7 +230,7 @@ export class LawsController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() requestSummaryDto?: RequestSummaryDto,
   ): Promise<LawSummaryResponseData> {
-    return this.lawsService.createLawSummary(type, id, requestSummaryDto.recentSummaryMsg);
+    return this.lawsService.createLawSummary(type, id.toString(), requestSummaryDto.recentSummaryMsg);
   }
 
   @Post(':type/:id/summary-stream')
@@ -218,9 +259,72 @@ export class LawsController {
   ) {
     const lawSummaryReadableStream: Stream<ChatCompletionChunk> = await this.lawsService.createLawStreamSummary(
       type,
-      id,
+      id.toString(),
       requestSummaryDto.recentSummaryMsg,
     );
     return this.openaiService.sendResWithOpenAIStream(res, lawSummaryReadableStream);
+  }
+
+  @Post(':type/:id/bookmark')
+  @UseGuards(AuthGuard('jwt-access'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: '판례/법령 저장 요청',
+  })
+  @ApiParam({
+    name: 'type',
+    enum: SearchTabEnum,
+    description: 'prec: 판례, statute: 법령',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
+  })
+  @ApiCreatedResponse({
+    description: 'Successfule response',
+    content: {
+      'application/json': {
+        schema: {
+          properties: {
+            bookmarkId: {
+              type: 'number',
+              example: 1,
+            },
+          },
+        },
+      },
+    },
+  })
+  postLawBookmark(
+    @JwtUserPayload() jwtUser: JwtPayloadInfo,
+    @Param('type', new ParseEnumPipe(SearchTabEnum))
+    type: SearchTabEnum,
+    @Param('id', new ParseIntPipe()) law_id: number,
+  ) {
+    return this.lawsService.postLawBookmark(jwtUser.userId, law_id.toString(), type);
+  }
+
+  @Delete(':type/:id/bookmark')
+  @UseGuards(AuthGuard('jwt-access'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: '판례/법령 저장 취소 요청',
+  })
+  @ApiParam({
+    name: 'type',
+    enum: SearchTabEnum,
+    description: 'prec: 판례, statute: 법령',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
+  })
+  deleteLawBookmark(
+    @JwtUserPayload() jwtUser: JwtPayloadInfo,
+    @Param('type', new ParseEnumPipe(SearchTabEnum))
+    type: SearchTabEnum,
+    @Param('id', new ParseIntPipe()) law_id: number,
+  ) {
+    return this.lawsService.deleteLawBookmark(jwtUser.userId, law_id.toString(), type);
   }
 }

@@ -8,15 +8,15 @@ datasource db {
 }
 
 model User {
-  id               Int               @id @default(autoincrement())
-  email            String            @unique @db.VarChar(255)
-  name             String            @db.VarChar(30)
-  profileImage     String?           @map("profile_image") @db.VarChar(255)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
-  deletedAt        DateTime?         @map("deleted_at") @db.Timestamp(0)
-  updatedAt        DateTime          @default(now()) @map("updated_at") @db.Timestamp(0)
-  userLawBookmarks UserLawBookmark[]
-  userOauths       UserOauth[]
+  id           Int           @id @default(autoincrement())
+  email        String        @unique @db.VarChar(255)
+  name         String        @db.VarChar(30)
+  profileImage String?       @map("profile_image") @db.VarChar(255)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamp(0)
+  updatedAt    DateTime      @default(now()) @map("updated_at") @db.Timestamp(0)
+  lawBookmarks LawBookmark[]
+  userOauths   UserOauth[]
 }
 
 model UserOauth {
@@ -32,7 +32,7 @@ model UserOauth {
   @@unique([oauthId, provider])
 }
 
-model UserLawBookmark {
+model LawBookmark {
   id        Int       @id @default(autoincrement())
   userId    Int       @map("user_id")
   lawType   LawType   @map("law_type")
@@ -42,8 +42,8 @@ model UserLawBookmark {
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(0)
   user      User      @relation(fields: [userId], references: [id])
 
-  @@unique([userId, lawId])
-  @@index([userId, lawType], map: "UserLawBookmark_user_id_law_type_index")
+  @@unique([userId, lawId, lawType])
+  @@index([userId, lawType], map: "LawBookmark_user_id_law_type_index")
 }
 
 enum Provider {

@@ -108,6 +108,24 @@ export class LawsService {
     };
   }
 
+  async createLawAdditionalSummary(
+    type: SearchTabEnum,
+    id: string,
+  ): Promise<Pick<LawSummaryResponseData, 'easyTitle' | 'keywords'>> {
+    const MAX_RETRY_KEYWORD_TITLE_COUNT = 2;
+    const lawDetail = await this.getLawDetail(type, id);
+
+    const { easyTitle: easyTitle, keywords: keywords } = await this.fetchTitleAndKeywords(
+      lawDetail as PrecDetailData,
+      MAX_RETRY_KEYWORD_TITLE_COUNT,
+    );
+
+    return {
+      easyTitle,
+      keywords,
+    };
+  }
+
   async createLawStreamSummary(type: SearchTabEnum, id: string, recentSummaryMsg: string) {
     const lawDetail = await this.getLawDetail(type, id);
 

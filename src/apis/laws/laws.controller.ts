@@ -234,13 +234,37 @@ export class LawsController {
     return this.lawsService.createLawSummary(type, id.toString(), requestSummaryDto.recentSummaryMsg);
   }
 
+  @Post(':type/:id/additional-summary')
+  @ApiOperation({
+    summary: '판례/법령 부가 정보 요약 요청',
+    description: `
+    본문 요약을 제외한 추가 요약을 요청합니다.\n
+    -> 판례/법령에 대한 '제목', '키워드'만 제공됩니다.`,
+  })
+  @Throttle(4, 60)
+  @ApiParam({
+    name: 'type',
+    enum: SearchTabEnum,
+    description: 'prec: 판례, statute: 법령',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
+  })
+  createLawAdditionalSummary(
+    @Param('type', new ParseEnumPipe(SearchTabEnum))
+    type: SearchTabEnum,
+    @Param('id', new ParseIntPipe()) id: number,
+  ): Promise<Pick<LawSummaryResponseData, 'easyTitle' | 'keywords'>> {
+    return this.lawsService.createLawAdditionalSummary(type, id.toString());
+  }
+
   @Sse(':type/:id/summary-stream')
   @ApiOperation({
-    summary: '판례/법령 요약 요청 - stream version',
+    summary: '판례/법령 본문 요약 요청 - SSE stream version',
     description: `
       '더 쉽게 해석'을 위한 요청을 보내는 경우, 마지막에 제공받았던 요약문을 body의 recentAssistMsg에 담아서 요청합니다.\n\n
-      stream 버전 요약 API는 Chunk Data가 응답으로 제공됩니다. 클라이언트에서는 ReadableStream 형태로 받으시면 됩니다. (제목, 키워드를 제외한 본문 요약 내용만 제공됩니다.)
-      `,
+      stream 버전 요약 API는 SSE로 응답이 제공됩니다. 요약 완료 시에는 이름이 'close'인 SSE event에 'true'(문자열) 데이터가 담겨서 넘어갑니다.`,
   })
   @ApiParam({
     name: 'type',
@@ -250,6 +274,33 @@ export class LawsController {
   @ApiParam({
     name: 'id',
     description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
+  })
+  @ApiBody({
+    examples: {
+      '최초 요약 요청': {
+        value: {
+          recentSummaryMsg: null,
+        },
+        description: '최초 요약 요청',
+      },
+      '더 쉽게 해석': {
+        value: {
+          recentSummaryMsg: '직전에 제공받았던 요약문',
+        },
+        description: '더 쉽게 해석 요청',
+      },
+    },
+    schema: {
+      properties: {
+        recentSummaryMsg: {
+          type: 'string',
+          nullable: true,
+          description: '직전에 제공받은 요약문',
+        },
+      },
+    },
+    required: false,
+    description: 'recentSummaryMsg: 직전에 제공받은 요약문을 입력합니다.',
   })
   async createLawStreamSummary(
     @Param('type', new ParseEnumPipe(SearchTabEnum)) type: SearchTabEnum,

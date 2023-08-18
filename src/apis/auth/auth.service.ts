@@ -86,14 +86,20 @@ export class AuthService {
 
   async generateTokens(user: JwtPayloadInfo): Promise<{ accessToken: string; refreshToken: string }> {
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(user, {
-        secret: this.configService.get('ACCESS_SECRET_KEY'),
-        expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
-      }),
-      this.jwtService.signAsync(user, {
-        secret: this.configService.get('REFRESH_SECRET_KEY'),
-        expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
-      }),
+      this.jwtService.signAsync(
+        { userId: user.userId },
+        {
+          secret: this.configService.get('ACCESS_SECRET_KEY'),
+          expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
+        },
+      ),
+      this.jwtService.signAsync(
+        { userId: user.userId },
+        {
+          secret: this.configService.get('REFRESH_SECRET_KEY'),
+          expiresIn: this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
+        },
+      ),
     ]);
 
     return {
@@ -102,6 +108,8 @@ export class AuthService {
     };
   }
 
+  // cookie 에 SameSite 옵션을 'None'으로 해야만 CORS 가 가능함.(다른 도메인간 쿠키 공유)
+  // SameSite 옵션이 'None' 인 경우, Secure 옵션은 true 여야만한다. -> 사이트가 https 여야만 함.
   setRefreshToken(res: Response, refreshToken: string) {
     res.cookie('refreshToken', refreshToken, {
       domain:
@@ -110,7 +118,7 @@ export class AuthService {
           : this.configService.get('COMMON_COOKIE_DOMAIN'),
       httpOnly: true,
       path: '/',
-      sameSite: 'none',
+      sameSite: this.configService.get('NODE_ENV') === 'production' ? 'none' : 'strict',
       secure: this.configService.get('NODE_ENV') === 'production',
       maxAge: 24 * 60 * 60 * 1000 * 14, // 14일
     });

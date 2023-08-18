@@ -110,6 +110,7 @@ export class AuthService {
           : this.configService.get('COMMON_COOKIE_DOMAIN'),
       httpOnly: true,
       path: '/',
+      sameSite: 'none',
       secure: this.configService.get('NODE_ENV') === 'production',
       maxAge: 24 * 60 * 60 * 1000 * 14, // 14일
     });

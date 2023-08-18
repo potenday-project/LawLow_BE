@@ -24,7 +24,7 @@ import { GetLawListDto } from './dtos/get-laws.dto';
 import { OpenaiService } from 'src/shared/services/openai.service';
 import { ChatCompletionMessage } from 'openai/resources/chat';
 import { PrismaService } from 'src/common/prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, LawBookmark } from '@prisma/client';
 import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
 
 @Injectable()
@@ -106,6 +106,21 @@ export class LawsService {
       summary: onlySummaryResponse.choices[0].message.content,
       keywords,
     };
+  }
+
+  async getBookmarkedLawInfo(userId: number, lawId: string, lawType: SearchTabEnum): Promise<LawBookmark> | null {
+    if (!userId || !lawId || !lawType) return null;
+
+    const bookmarkedLaw = await this.prismaService.lawBookmark.findFirst({
+      where: {
+        userId,
+        lawId,
+        lawType,
+        deletedAt: null,
+      },
+    });
+
+    return bookmarkedLaw;
   }
 
   async createLawAdditionalSummary(

@@ -2,6 +2,8 @@ import { Request } from 'express';
 
 export interface JwtPayloadInfo {
   userId: number;
+  iat?: number;
+  exp?: number;
 }
 
 export interface CreateUserInfo {

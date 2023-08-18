@@ -21,6 +21,8 @@ import {
   ApiCreatedResponse,
   ApiBearerAuth,
   ApiOkResponse,
+  getSchemaPath,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 import { GetLawListDto } from './dtos/get-laws.dto';
 import { RequestSummaryDto } from './dtos/request-summary.dto';
@@ -30,16 +32,20 @@ import {
   StatuteDetailData,
   PrecDetailData,
   LawSummaryResponseData,
+  JwtPayloadInfo,
 } from 'src/common/types';
 import { Throttle } from '@nestjs/throttler';
 import { OpenaiService } from 'src/shared/services/openai.service';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk } from 'openai/resources/chat';
 import { JwtUserPayload } from 'src/common/decorators/jwt-user.decorator';
-import { JwtPayloadInfo } from 'src/common/types';
 import { AuthGuard } from '@nestjs/passport';
 import { GetBookmarkLawListDto } from './dtos/get-bookmark-laws.dto';
 import { Response } from 'express';
+import { OnlyGetAccessTokenValueGuard } from '../auth/security/guards/only-get-access-token-value.guard';
+import { LawBookmark } from '@prisma/client';
+import { ResponsePrecDto } from './dtos/prec.response.dto';
+import { ResponseStatuteDto } from './dtos/statute.response.dto';
 
 @Controller({ path: 'laws' })
 @ApiTags('Laws')
@@ -85,6 +91,8 @@ export class LawsController {
   }
 
   @Get(':type/:id')
+  @UseGuards(OnlyGetAccessTokenValueGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: '판례/법령 상세 조회' })
   @ApiParam({
     name: 'type',
@@ -96,12 +104,41 @@ export class LawsController {
     type: 'number',
     description: '판례 또는 법령의 ID(판례일련번호/법령ID)',
   })
-  getLawDetail(
+  @ApiExtraModels(ResponsePrecDto, ResponseStatuteDto)
+  @ApiOkResponse({
+    description: 'Successfule response',
+    schema: {
+      properties: {
+        lawInfo: {
+          oneOf: [{ $ref: getSchemaPath(ResponsePrecDto) }, { $ref: getSchemaPath(ResponseStatuteDto) }],
+        },
+        isBookmarked: {
+          type: 'boolean',
+        },
+      },
+    },
+  })
+  async getLawDetail(
+    @JwtUserPayload() jwtUser: JwtPayloadInfo,
     @Param('type', new ParseEnumPipe(SearchTabEnum))
     type: SearchTabEnum,
     @Param('id', new ParseIntPipe()) id: number,
-  ): Promise<StatuteDetailData | PrecDetailData> {
-    return this.lawsService.getLawDetail(type, id.toString());
+  ): Promise<{
+    lawInfo: StatuteDetailData | PrecDetailData;
+    isBookmarked: boolean;
+  }> {
+    const bookmarkedLawPromise: Promise<LawBookmark> = this.lawsService.getBookmarkedLawInfo(
+      jwtUser.userId,
+      id.toString(),
+      type,
+    );
+    const lawDetailPromise = this.lawsService.getLawDetail(type, id.toString());
+    const [bookmarkedLaw, lawDetail] = await Promise.all([bookmarkedLawPromise, lawDetailPromise]);
+
+    return {
+      lawInfo: lawDetail,
+      isBookmarked: !!bookmarkedLaw,
+    };
   }
 
   @Post(':type/:id/summary')

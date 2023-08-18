@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, MessageEvent } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { Stream } from 'openai/streaming';
 import { ChatCompletionChunk, ChatCompletionMessage, ChatCompletion } from 'openai/resources/chat';
@@ -6,7 +6,6 @@ import { ConfigService } from '@nestjs/config';
 import { encoding_for_model } from '@dqbd/tiktoken';
 import { TiktokenModel } from '@dqbd/tiktoken';
 import { Response } from 'express';
-import { Observable, Subscriber } from 'rxjs';
 
 @Injectable()
 export class OpenaiService {

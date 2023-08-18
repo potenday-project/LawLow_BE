@@ -134,4 +134,8 @@ export {
   StatuteDetailData,
   StatuteArticle,
   LawSummaryResponseData,
+  StatuteAddendum,
+  StatuteParagraph,
+  StatuteSubparagraph,
+  Statuteitem,
 };

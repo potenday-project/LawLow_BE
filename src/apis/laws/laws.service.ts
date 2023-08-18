@@ -341,7 +341,7 @@ export class LawsService {
   }): Omit<PageResponse<TransformedCleanLawList>, 'list'> {
     const { type, page, take } = params;
     const lawListKey = type === 'prec' ? 'PrecSearch' : 'LawSearch';
-    const totalCount = totalCountParam || convertedLaws[lawListKey].totalCnt._text;
+    const totalCount = totalCountParam ?? convertedLaws[lawListKey].totalCnt._text;
     const totalPages = Math.ceil(totalCount / take);
 
     return {

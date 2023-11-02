@@ -524,7 +524,7 @@ export class LawsService {
       });
       messages.push({
         role: 'user',
-        content: '더 쉽게 설명 부탁해.',
+        content: this.configService.get<string>('LAW_MORE_EASY_PROMPT'),
       });
     }
 
